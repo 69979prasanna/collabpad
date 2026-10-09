@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Core library for Phase 1
+# Core library for CollabPad
 add_library(collabpad_core INTERFACE)
 target_include_directories(collabpad_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/core/include
@@ -14,3 +14,7 @@ target_include_directories(collabpad_core INTERFACE
 # Phase 1 terminal demo
 add_executable(collabpad_demo core/tests/phase1_demo.cpp)
 target_link_libraries(collabpad_demo PRIVATE collabpad_core)
+
+# Phase 2 terminal demo
+add_executable(collabpad_phase2_demo core/tests/phase2_demo.cpp)
+target_link_libraries(collabpad_phase2_demo PRIVATE collabpad_core)
