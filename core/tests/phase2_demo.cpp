@@ -18,10 +18,6 @@ int main() {
     std::cout << "       COLLABPAD PHASE 2: RGA CONCURRENT ENGINE\n";
     printDivider();
     std::cout << "\n";
-
-    // -------------------------------------------------------------------------
-    // Step 1: Initializing Replicas
-    // -------------------------------------------------------------------------
     std::cout << "[Step 1] Initializing Replicas...\n";
     collabpad::Replica replicaA(1);
     collabpad::Replica replicaB(2);
@@ -30,9 +26,6 @@ int main() {
     printReplicaState("Replica B", replicaB);
     std::cout << "\n";
 
-    // -------------------------------------------------------------------------
-    // Step 2: Establish Initial Shared Text ("CAT")
-    // -------------------------------------------------------------------------
     std::cout << "[Step 2] Establishing initial shared text: \"CAT\"\n";
     
     // Insert 'C' at beginning (nullopt parent)
