@@ -12,12 +12,14 @@
 
 #include <iostream>
 #include <memory>
-#include <cstdlib>   // std::atoi
+#include <cstdlib>   // atoi
 #include <csignal>   // signal, SIGINT
+
+using namespace std;
 
 // Global flag so Ctrl+C can gracefully stop the server.
 // Using a volatile sig_atomic_t is the correct POSIX way to handle signals.
-static volatile std::sig_atomic_t g_stopRequested = 0;
+static volatile sig_atomic_t g_stopRequested = 0;
 
 static void signalHandler(int /*sig*/) {
     g_stopRequested = 1;
@@ -29,7 +31,7 @@ static void signalHandler(int /*sig*/) {
 static collabpad::WebSocketServer* g_server = nullptr;
 
 static void onSignal(int sig) {
-    std::cout << "\n[Main] Signal " << sig << " received. Stopping server...\n";
+    cout << "\n[Main] Signal " << sig << " received. Stopping server...\n";
     if (g_server) {
         g_server->stop();
     }
@@ -39,28 +41,28 @@ static void onSignal(int sig) {
 int main(int argc, char* argv[]) {
     uint16_t port = 8080;
     if (argc >= 2) {
-        int p = std::atoi(argv[1]);
+        int p = atoi(argv[1]);
         if (p > 0 && p <= 65535) {
             port = static_cast<uint16_t>(p);
         } else {
-            std::cerr << "[Main] Invalid port: " << argv[1]
-                      << ". Using default 8080.\n";
+            cerr << "[Main] Invalid port: " << argv[1]
+                 << ". Using default 8080.\n";
         }
     }
 
-    std::cout << "========================================\n"
-              << "  CollabPad WebSocket Server  (Phase 3)\n"
-              << "========================================\n";
+    cout << "========================================\n"
+         << "  CollabPad WebSocket Server  (Phase 3)\n"
+         << "========================================\n";
 
     // Set up Ctrl+C handler
-    std::signal(SIGINT, onSignal);
+    signal(SIGINT, onSignal);
 
-    auto hub = std::make_shared<collabpad::DocumentHub>();
+    auto hub = make_shared<collabpad::DocumentHub>();
     collabpad::WebSocketServer server(port, hub);
     g_server = &server;
 
     server.run(); // blocks until stop() is called
 
-    std::cout << "[Main] Server exited cleanly.\n";
+    cout << "[Main] Server exited cleanly.\n";
     return 0;
 }

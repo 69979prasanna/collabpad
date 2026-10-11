@@ -4,9 +4,11 @@
 #include <algorithm>
 #include <iostream>
 
+using namespace std;
+
 namespace collabpad {
 
-void DocumentHub::join(const std::string& docId, std::shared_ptr<Session> session) {
+void DocumentHub::join(const string& docId, shared_ptr<Session> session) {
     auto& list = docs_[docId];
     // Avoid double-registration for the same session id
     for (const auto& s : list) {
@@ -15,31 +17,31 @@ void DocumentHub::join(const std::string& docId, std::shared_ptr<Session> sessio
         }
     }
     list.push_back(session);
-    std::cout << "[Hub] Session " << session->id()
-              << " joined document \"" << docId << "\". "
-              << "Subscribers now: " << list.size() << "\n";
+    cout << "[Hub] Session " << session->id()
+         << " joined document \"" << docId << "\". "
+         << "Subscribers now: " << list.size() << "\n";
 }
 
-void DocumentHub::leave(const std::string& docId, uint32_t sessionId) {
+void DocumentHub::leave(const string& docId, uint32_t sessionId) {
     auto it = docs_.find(docId);
     if (it == docs_.end()) return;
 
     auto& list = it->second;
     list.erase(
-        std::remove_if(list.begin(), list.end(),
-            [sessionId](const std::shared_ptr<Session>& s) {
+        remove_if(list.begin(), list.end(),
+            [sessionId](const shared_ptr<Session>& s) {
                 return s->id() == sessionId;
             }),
         list.end()
     );
-    std::cout << "[Hub] Session " << sessionId
-              << " left document \"" << docId << "\". "
-              << "Subscribers remaining: " << list.size() << "\n";
+    cout << "[Hub] Session " << sessionId
+         << " left document \"" << docId << "\". "
+         << "Subscribers remaining: " << list.size() << "\n";
 }
 
-void DocumentHub::broadcast(const std::string& docId,
+void DocumentHub::broadcast(const string& docId,
                              uint32_t senderSessionId,
-                             const std::string& message) {
+                             const string& message) {
     auto it = docs_.find(docId);
     if (it == docs_.end()) return;
 
@@ -55,8 +57,8 @@ void DocumentHub::prune() {
     for (auto& pair : docs_) {
         auto& list = pair.second;
         list.erase(
-            std::remove_if(list.begin(), list.end(),
-                [](const std::shared_ptr<Session>& s) {
+            remove_if(list.begin(), list.end(),
+                [](const shared_ptr<Session>& s) {
                     return !s || !s->isAlive();
                 }),
             list.end()

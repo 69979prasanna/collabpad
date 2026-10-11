@@ -2,47 +2,49 @@
 #include <iostream>
 #include <vector>
 
-int main() {
-    std::cout << "========================================\n";
-    std::cout << "       COLLABPAD PHASE 1\n";
-    std::cout << "========================================\n\n";
+using namespace std;
 
-    std::cout << "Creating replicas...\n\n";
+int main() {
+    cout << "========================================\n";
+    cout << "       COLLABPAD PHASE 1\n";
+    cout << "========================================\n\n";
+
+    cout << "Creating replicas...\n\n";
 
     collabpad::Replica replicaA(1);
     collabpad::Replica replicaB(2);
 
-    std::cout << "Replica A: Site " << replicaA.getSiteId() << "\n";
-    std::cout << "Replica B: Site " << replicaB.getSiteId() << "\n\n";
+    cout << "Replica A: Site " << replicaA.getSiteId() << "\n";
+    cout << "Replica B: Site " << replicaB.getSiteId() << "\n\n";
 
-    std::cout << "Replica A inserts:\n";
-    const std::string textToInsert = "Hello";
-    std::vector<collabpad::InsertOp> operations;
+    cout << "Replica A inserts:\n";
+    const string textToInsert = "Hello";
+    vector<collabpad::InsertOp> operations;
 
     for (char ch : textToInsert) {
-        std::cout << ch << "\n";
+        cout << ch << "\n";
         operations.push_back(replicaA.localInsert(ch));
     }
 
-    std::cout << "\nReplica A:\n";
-    std::cout << replicaA.getText() << "\n\n";
+    cout << "\nReplica A:\n";
+    cout << replicaA.getText() << "\n\n";
 
-    std::cout << "Sending characters to Replica B...\n\n";
+    cout << "Sending characters to Replica B...\n\n";
     for (const auto& op : operations) {
         replicaB.applyRemoteInsert(op);
     }
 
-    std::cout << "Replica B:\n";
-    std::cout << replicaB.getText() << "\n\n";
+    cout << "Replica B:\n";
+    cout << replicaB.getText() << "\n\n";
 
-    std::cout << "----------------------------------------\n";
-    std::cout << "REPLICAS CONVERGED\n";
-    std::cout << "----------------------------------------\n\n";
+    cout << "----------------------------------------\n";
+    cout << "REPLICAS CONVERGED\n";
+    cout << "----------------------------------------\n\n";
 
-    std::cout << "A: " << replicaA.getText() << "\n";
-    std::cout << "B: " << replicaB.getText() << "\n\n";
+    cout << "A: " << replicaA.getText() << "\n";
+    cout << "B: " << replicaB.getText() << "\n\n";
 
-    std::cout << "========================================\n";
+    cout << "========================================\n";
 
     return 0;
 }

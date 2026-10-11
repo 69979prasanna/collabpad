@@ -4,3 +4,7 @@
 *.obj
 build/
 bin/
+
+# Node / Frontend
+client/node_modules/
+client/dist/

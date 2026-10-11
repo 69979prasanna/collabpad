@@ -41,3 +41,11 @@ target_include_directories(collabpad_server PRIVATE
 # ws2_32 provides WSAStartup, socket, select, send, recv, etc.
 target_link_libraries(collabpad_server PRIVATE ws2_32)
 
+# Optional WebAssembly target when configured with emcmake
+if(EMSCRIPTEN)
+    add_executable(collabpad_wasm wasm/bindings.cpp)
+    target_link_libraries(collabpad_wasm PRIVATE collabpad_core)
+    set_target_properties(collabpad_wasm PROPERTIES
+        LINK_FLAGS "--bind -s MODULARIZE=1 -s EXPORT_NAME=CollabPadWasm -s ALLOW_MEMORY_GROWTH=1"
+    )
+endif()

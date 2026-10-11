@@ -34,6 +34,8 @@
 #include <cstring>
 #include <cctype>
 
+using namespace std;
+
 // Link against ws2_32.lib — added in CMakeLists.txt
 
 namespace collabpad {
@@ -44,8 +46,8 @@ namespace collabpad {
 
 // Read the HTTP upgrade request from the socket.
 // Returns the raw header text, or "" on error.
-static std::string readHttpRequest(SOCKET sock) {
-    std::string buf;
+static string readHttpRequest(SOCKET sock) {
+    string buf;
     buf.reserve(512);
     char c;
     while (buf.size() < 8192) { // safety limit
@@ -64,44 +66,44 @@ static std::string readHttpRequest(SOCKET sock) {
 
 // Case-insensitive header value extraction.
 // Returns the value of the first header line matching "HeaderName: value".
-static std::string getHeader(const std::string& request, const std::string& name) {
+static string getHeader(const string& request, const string& name) {
     // Build lower-case version of the name for comparison
-    std::string nameLower = name;
-    for (char& c : nameLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    string nameLower = name;
+    for (char& c : nameLower) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
 
-    std::istringstream ss(request);
-    std::string line;
-    while (std::getline(ss, line)) {
+    istringstream ss(request);
+    string line;
+    while (getline(ss, line)) {
         // Remove trailing \r
         if (!line.empty() && line.back() == '\r') line.pop_back();
         // Find colon
         size_t colon = line.find(':');
-        if (colon == std::string::npos) continue;
-        std::string key = line.substr(0, colon);
-        for (char& c : key) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (colon == string::npos) continue;
+        string key = line.substr(0, colon);
+        for (char& c : key) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
         // trim trailing space from key
         while (!key.empty() && key.back() == ' ') key.pop_back();
         if (key == nameLower) {
-            std::string val = line.substr(colon + 1);
+            string val = line.substr(colon + 1);
             // trim leading space
             size_t start = val.find_first_not_of(" \t");
-            return (start == std::string::npos) ? "" : val.substr(start);
+            return (start == string::npos) ? "" : val.substr(start);
         }
     }
     return "";
 }
 
 // Compute the Sec-WebSocket-Accept value per RFC 6455 §4.2.2.
-static std::string computeAcceptKey(const std::string& clientKey) {
-    static const std::string magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    std::string combined = clientKey + magic;
+static string computeAcceptKey(const string& clientKey) {
+    static const string magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    string combined = clientKey + magic;
     auto digest = Sha1::compute(combined);
     return base64Encode(digest.data(), digest.size());
 }
 
 // Send the 101 Switching Protocols response.
-static bool sendHandshakeResponse(SOCKET sock, const std::string& acceptKey) {
-    std::string response =
+static bool sendHandshakeResponse(SOCKET sock, const string& acceptKey) {
+    string response =
         "HTTP/1.1 101 Switching Protocols\r\n"
         "Upgrade: websocket\r\n"
         "Connection: Upgrade\r\n"
@@ -122,13 +124,13 @@ static bool sendHandshakeResponse(SOCKET sock, const std::string& acceptKey) {
 // WebSocketServer
 // -------------------------------------------------------------------------
 
-WebSocketServer::WebSocketServer(uint16_t port, std::shared_ptr<DocumentHub> hub)
+WebSocketServer::WebSocketServer(uint16_t port, shared_ptr<DocumentHub> hub)
     : port_(port), hub_(hub) {
     // Initialise Winsock (must be done once per process)
     WSADATA wsaData;
     int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (err != 0) {
-        std::cerr << "[Server] WSAStartup failed: " << err << "\n";
+        cerr << "[Server] WSAStartup failed: " << err << "\n";
     }
 }
 
@@ -145,31 +147,31 @@ void WebSocketServer::stop() {
     }
 }
 
-std::shared_ptr<Session> WebSocketServer::doHandshake(uintptr_t clientSockHandle) {
+shared_ptr<Session> WebSocketServer::doHandshake(uintptr_t clientSockHandle) {
     SOCKET clientSock = static_cast<SOCKET>(clientSockHandle);
 
-    std::string request = readHttpRequest(clientSock);
+    string request = readHttpRequest(clientSock);
     if (request.empty()) {
-        std::cerr << "[Server] Empty HTTP request from client.\n";
+        cerr << "[Server] Empty HTTP request from client.\n";
         ::closesocket(clientSock);
         return nullptr;
     }
 
     // Validate it is a WebSocket upgrade request
-    std::string upgrade   = getHeader(request, "Upgrade");
-    std::string connection = getHeader(request, "Connection");
-    std::string wsKey     = getHeader(request, "Sec-WebSocket-Key");
+    string upgrade   = getHeader(request, "Upgrade");
+    string connection = getHeader(request, "Connection");
+    string wsKey     = getHeader(request, "Sec-WebSocket-Key");
 
     // Case-insensitive check for "websocket"
-    std::string upgradeLower = upgrade;
-    for (char& c : upgradeLower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    string upgradeLower = upgrade;
+    for (char& c : upgradeLower) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
 
     if (upgradeLower != "websocket" || wsKey.empty()) {
         // Respond with 400 Bad Request for non-WebSocket connections
-        std::string bad = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+        string bad = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
         ::send(clientSock, bad.c_str(), static_cast<int>(bad.size()), 0);
         ::closesocket(clientSock);
-        std::cerr << "[Server] Rejected non-WebSocket connection.\n";
+        cerr << "[Server] Rejected non-WebSocket connection.\n";
         return nullptr;
     }
 
@@ -179,10 +181,10 @@ std::shared_ptr<Session> WebSocketServer::doHandshake(uintptr_t clientSockHandle
         wsKey.pop_back();
     }
 
-    std::string acceptKey = computeAcceptKey(wsKey);
+    string acceptKey = computeAcceptKey(wsKey);
     if (!sendHandshakeResponse(clientSock, acceptKey)) {
         ::closesocket(clientSock);
-        std::cerr << "[Server] Failed to send handshake response.\n";
+        cerr << "[Server] Failed to send handshake response.\n";
         return nullptr;
     }
 
@@ -190,15 +192,15 @@ std::shared_ptr<Session> WebSocketServer::doHandshake(uintptr_t clientSockHandle
     static uint32_t nextId = 1;
     uint32_t sessionId = nextId++;
 
-    std::cout << "[Server] WebSocket handshake complete. Session " << sessionId << " connected.\n";
-    return std::make_shared<Session>(
+    cout << "[Server] WebSocket handshake complete. Session " << sessionId << " connected.\n";
+    return make_shared<Session>(
         static_cast<uintptr_t>(clientSock), hub_, sessionId);
 }
 
 void WebSocketServer::pruneDeadSessions() {
     sessions_.erase(
-        std::remove_if(sessions_.begin(), sessions_.end(),
-            [](const std::shared_ptr<Session>& s) {
+        remove_if(sessions_.begin(), sessions_.end(),
+            [](const shared_ptr<Session>& s) {
                 return !s || !s->isAlive();
             }),
         sessions_.end()
@@ -210,7 +212,7 @@ void WebSocketServer::run() {
     // Create the listening socket
     SOCKET listenSock = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listenSock == INVALID_SOCKET) {
-        std::cerr << "[Server] socket() failed: " << WSAGetLastError() << "\n";
+        cerr << "[Server] socket() failed: " << WSAGetLastError() << "\n";
         return;
     }
     listenSock_ = static_cast<uintptr_t>(listenSock);
@@ -226,17 +228,17 @@ void WebSocketServer::run() {
     addr.sin_port = htons(port_);
 
     if (::bind(listenSock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR) {
-        std::cerr << "[Server] bind() failed: " << WSAGetLastError() << "\n";
+        cerr << "[Server] bind() failed: " << WSAGetLastError() << "\n";
         return;
     }
     if (::listen(listenSock, SOMAXCONN) == SOCKET_ERROR) {
-        std::cerr << "[Server] listen() failed: " << WSAGetLastError() << "\n";
+        cerr << "[Server] listen() failed: " << WSAGetLastError() << "\n";
         return;
     }
 
     running_ = true;
-    std::cout << "[Server] Listening on port " << port_ << " ...\n";
-    std::cout << "[Server] Press Ctrl+C to stop.\n";
+    cout << "[Server] Listening on port " << port_ << " ...\n";
+    cout << "[Server] Press Ctrl+C to stop.\n";
 
     while (running_) {
         // Build the fd_set from the listening socket + all live session sockets
@@ -267,7 +269,7 @@ void WebSocketServer::run() {
         if (ready == SOCKET_ERROR) {
             int e = WSAGetLastError();
             if (e == WSAEINTR) continue; // interrupted, retry
-            std::cerr << "[Server] select() error: " << e << "\n";
+            cerr << "[Server] select() error: " << e << "\n";
             break;
         }
 
@@ -287,7 +289,7 @@ void WebSocketServer::run() {
             if (!s || !s->isAlive()) continue;
             SOCKET sessionFd = static_cast<SOCKET>(s->sockFd());
             if (FD_ISSET(sessionFd, &readSet)) {
-                std::string frame = s->readFrame();
+                string frame = s->readFrame();
                 if (!frame.empty()) {
                     s->handleMessage(frame);
                 }
@@ -298,7 +300,7 @@ void WebSocketServer::run() {
         pruneDeadSessions();
     }
 
-    std::cout << "[Server] Stopped.\n";
+    cout << "[Server] Stopped.\n";
 }
 
 } // namespace collabpad

@@ -29,6 +29,9 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <cctype>
+
+using namespace std;
 
 namespace collabpad {
 
@@ -39,14 +42,14 @@ namespace collabpad {
 
 // Returns the value of the first occurrence of "key":"value" in json.
 // Returns "" if not found.
-static std::string jsonGetString(const std::string& json, const std::string& key) {
+static string jsonGetString(const string& json, const string& key) {
     // Look for "key":"
-    std::string needle = "\"" + key + "\"";
+    string needle = "\"" + key + "\"";
     size_t kpos = json.find(needle);
-    if (kpos == std::string::npos) return "";
+    if (kpos == string::npos) return "";
 
     size_t colon = json.find(':', kpos + needle.size());
-    if (colon == std::string::npos) return "";
+    if (colon == string::npos) return "";
 
     // Skip whitespace after colon
     size_t vstart = colon + 1;
@@ -58,7 +61,7 @@ static std::string jsonGetString(const std::string& json, const std::string& key
     ++vstart; // skip opening quote
 
     // Find closing quote (handle simple \")
-    std::string val;
+    string val;
     for (size_t i = vstart; i < json.size(); ++i) {
         if (json[i] == '\\' && i + 1 < json.size()) {
             ++i; // skip escaped char
@@ -76,7 +79,7 @@ static std::string jsonGetString(const std::string& json, const std::string& key
 // Session
 // --------------------------------------------------------------------------
 
-Session::Session(uintptr_t sock, std::shared_ptr<DocumentHub> hub, uint32_t sessionId)
+Session::Session(uintptr_t sock, shared_ptr<DocumentHub> hub, uint32_t sessionId)
     : sock_(sock), hub_(hub), sessionId_(sessionId) {}
 
 Session::~Session() {
@@ -95,7 +98,7 @@ void Session::close() {
     sendRaw(reinterpret_cast<const char*>(closeFrame), 2);
 
     ::closesocket(static_cast<SOCKET>(sock_));
-    std::cout << "[Session " << sessionId_ << "] Closed.\n";
+    cout << "[Session " << sessionId_ << "] Closed.\n";
 }
 
 bool Session::sendRaw(const char* data, size_t length) {
@@ -112,12 +115,12 @@ bool Session::sendRaw(const char* data, size_t length) {
     return true;
 }
 
-void Session::send(const std::string& message) {
+void Session::send(const string& message) {
     if (!alive_) return;
 
     // Build a WebSocket text frame (unmasked, server → client).
     // Opcode 0x1 = text.  FIN bit set.
-    std::vector<uint8_t> frame;
+    vector<uint8_t> frame;
     frame.push_back(0x81); // FIN + text opcode
 
     size_t len = message.size();
@@ -152,7 +155,7 @@ static bool recvExact(SOCKET sock, uint8_t* buf, size_t n) {
     return true;
 }
 
-std::string Session::readFrame() {
+string Session::readFrame() {
     if (!alive_) return "";
 
     SOCKET sock = static_cast<SOCKET>(sock_);
@@ -189,14 +192,14 @@ std::string Session::readFrame() {
 
     // Safety limit: refuse frames larger than 1 MiB to prevent memory exhaustion
     if (payloadLen > 1024 * 1024) {
-        std::cerr << "[Session " << sessionId_ << "] Frame too large ("
-                  << payloadLen << " bytes), closing.\n";
+        cerr << "[Session " << sessionId_ << "] Frame too large ("
+             << payloadLen << " bytes), closing.\n";
         alive_ = false;
         return "";
     }
 
     // Read payload
-    std::vector<uint8_t> payload(static_cast<size_t>(payloadLen));
+    vector<uint8_t> payload(static_cast<size_t>(payloadLen));
     if (payloadLen > 0) {
         if (!recvExact(sock, payload.data(), static_cast<size_t>(payloadLen))) {
             alive_ = false;
@@ -217,7 +220,7 @@ std::string Session::readFrame() {
     }
     if (opcode == 0x9) {
         // Ping → send pong
-        std::vector<uint8_t> pong;
+        vector<uint8_t> pong;
         pong.push_back(0x8A); // FIN + pong opcode
         pong.push_back(static_cast<uint8_t>(payloadLen & 0x7F));
         pong.insert(pong.end(), payload.begin(), payload.end());
@@ -230,42 +233,42 @@ std::string Session::readFrame() {
     }
 
     // Text frame: return payload as string
-    return std::string(payload.begin(), payload.end());
+    return string(payload.begin(), payload.end());
 }
 
-void Session::handleMessage(const std::string& json) {
+void Session::handleMessage(const string& json) {
     if (json.empty()) return;
 
-    std::string type = jsonGetString(json, "type");
+    string type = jsonGetString(json, "type");
     if (type.empty()) {
-        std::cerr << "[Session " << sessionId_ << "] Missing \"type\" field, ignoring.\n";
+        cerr << "[Session " << sessionId_ << "] Missing \"type\" field, ignoring.\n";
         return;
     }
 
     if (type == "join") {
         handleJoin(json);
-    } else if (type == "op") {
+    } else if (type == "op" || type == "cursor" || type == "presence") {
         handleOperation(json);
     } else {
-        std::cerr << "[Session " << sessionId_ << "] Unknown message type \""
-                  << type << "\", ignoring.\n";
+        cerr << "[Session " << sessionId_ << "] Unknown message type \""
+             << type << "\", ignoring.\n";
     }
 }
 
-void Session::handleJoin(const std::string& fullJson) {
-    std::string newDocId = jsonGetString(fullJson, "docId");
+void Session::handleJoin(const string& fullJson) {
+    string newDocId = jsonGetString(fullJson, "docId");
     if (newDocId.empty()) {
-        std::cerr << "[Session " << sessionId_ << "] join: missing or empty docId.\n";
+        cerr << "[Session " << sessionId_ << "] join: missing or empty docId.\n";
         return;
     }
     // Basic validation: docId must be alphanumeric + dash + underscore, max 64 chars
     if (newDocId.size() > 64) {
-        std::cerr << "[Session " << sessionId_ << "] join: docId too long.\n";
+        cerr << "[Session " << sessionId_ << "] join: docId too long.\n";
         return;
     }
     for (char c : newDocId) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_') {
-            std::cerr << "[Session " << sessionId_ << "] join: docId contains invalid character.\n";
+        if (!isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_') {
+            cerr << "[Session " << sessionId_ << "] join: docId contains invalid character.\n";
             return;
         }
     }
@@ -278,20 +281,20 @@ void Session::handleJoin(const std::string& fullJson) {
     hub_->join(docId_, shared_from_this());
 
     // Send acknowledgement back to the joining client
-    std::string ack = "{\"type\":\"joined\",\"docId\":\"" + docId_ + "\",\"sessionId\":"
-                    + std::to_string(sessionId_) + "}";
+    string ack = "{\"type\":\"joined\",\"docId\":\"" + docId_ + "\",\"sessionId\":"
+               + to_string(sessionId_) + "}";
     send(ack);
-    std::cout << "[Session " << sessionId_ << "] Joined doc \"" << docId_ << "\"\n";
+    cout << "[Session " << sessionId_ << "] Joined doc \"" << docId_ << "\"\n";
 }
 
-void Session::handleOperation(const std::string& fullJson) {
+void Session::handleOperation(const string& fullJson) {
     if (docId_.empty()) {
-        std::cerr << "[Session " << sessionId_ << "] op received before join, ignoring.\n";
+        cerr << "[Session " << sessionId_ << "] message received before join, ignoring.\n";
         return;
     }
-    std::string opDocId = jsonGetString(fullJson, "docId");
+    string opDocId = jsonGetString(fullJson, "docId");
     if (opDocId != docId_) {
-        std::cerr << "[Session " << sessionId_ << "] op docId mismatch, ignoring.\n";
+        cerr << "[Session " << sessionId_ << "] op docId mismatch, ignoring.\n";
         return;
     }
     // Broadcast the raw JSON (unchanged) to all other sessions in the same doc.
