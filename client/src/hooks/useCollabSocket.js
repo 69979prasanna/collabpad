@@ -1,7 +1,7 @@
 // client/src/hooks/useCollabSocket.js
 // Dedicated WebSocket management hook for CollabPad.
 // Handles room joining, operation relay, collaborator presence, cursor synchronization,
-// and automatic reconnection.
+// bounded exponential backoff reconnection, and missed-operation recovery.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
@@ -22,6 +22,7 @@ export function useCollabSocket({
   siteId,
   userName = 'Collaborator',
   onRemoteOp,
+  onSync,
 }) {
   const [connectionStatus, setConnectionStatus] = useState('connecting'); // 'connecting' | 'online' | 'offline'
   const [sessionId, setSessionId] = useState(null);
@@ -32,8 +33,16 @@ export function useCollabSocket({
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const presenceIntervalRef = useRef(null);
+  const pruneIntervalRef = useRef(null);
+  const backoffDelayRef = useRef(1000); // Initial 1000ms backoff
+  const offlineQueueRef = useRef([]); // Buffer ops created while offline
+  const lastCursorSendRef = useRef(0); // Throttle cursor broadcasts
+
   const onRemoteOpRef = useRef(onRemoteOp);
   onRemoteOpRef.current = onRemoteOp;
+
+  const onSyncRef = useRef(onSync);
+  onSyncRef.current = onSync;
 
   // Pick deterministic color based on siteId
   const userColor = COLLAB_COLORS[(siteId || 1) % COLLAB_COLORS.length];
@@ -58,18 +67,34 @@ export function useCollabSocket({
     return false;
   }, []);
 
-  // Send an RGA operation to the room
+  // Send an RGA operation to the room (buffers if offline)
   const sendOperation = useCallback((op) => {
-    return send({
+    const payload = {
       type: 'op',
       docId,
       siteId,
       op,
-    });
-  }, [send, docId, siteId]);
+    };
 
-  // Broadcast local cursor position
-  const sendCursor = useCallback((cursorPos) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(payload));
+      return true;
+    } else {
+      // Buffer offline operation for safe recovery upon reconnection
+      offlineQueueRef.current.push(payload);
+      logActivity('Local edit buffered while disconnected', 'offline');
+      return false;
+    }
+  }, [docId, siteId, logActivity]);
+
+  // Broadcast local cursor position (throttled to 50ms)
+  const sendCursor = useCallback((cursorPos, status = 'editing') => {
+    const now = Date.now();
+    if (now - lastCursorSendRef.current < 45) {
+      return false; // Throttled to prevent flooding
+    }
+    lastCursorSendRef.current = now;
+
     return send({
       type: 'cursor',
       docId,
@@ -77,12 +102,27 @@ export function useCollabSocket({
       name: userName,
       color: userColor,
       cursor: cursorPos,
+      status,
     });
   }, [send, docId, siteId, userName, userColor]);
 
-  // Connect and lifecycle
+  // Connect and lifecycle with bounded exponential backoff
   useEffect(() => {
     let isCancelled = false;
+
+    function scheduleReconnect() {
+      if (isCancelled) return;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+
+      // Bounded exponential backoff: 1s, ~1.8s, ~3.2s, ... up to 15s max with jitter
+      const currentDelay = backoffDelayRef.current;
+      const jitter = Math.floor(Math.random() * 400);
+      const nextDelay = Math.min(15000, Math.floor(currentDelay * 1.8) + jitter);
+      backoffDelayRef.current = nextDelay;
+
+      console.log(`[WebSocket] Scheduling reconnection in ${currentDelay}ms...`);
+      reconnectTimeoutRef.current = setTimeout(connect, currentDelay);
+    }
 
     function connect() {
       if (isCancelled) return;
@@ -99,6 +139,7 @@ export function useCollabSocket({
           }
           console.log(`[WebSocket] Connected to ${serverUrl}. Joining room "${docId}"...`);
           setConnectionStatus('online');
+          backoffDelayRef.current = 1000; // Reset backoff on successful connection
 
           // Send join message per protocol
           ws.send(JSON.stringify({
@@ -129,6 +170,27 @@ export function useCollabSocket({
             if (data.type === 'joined') {
               setSessionId(data.sessionId);
               console.log(`[WebSocket] Successfully joined room "${data.docId}" (Session #${data.sessionId})`);
+
+              // Load persistent document snapshot if present
+              if (data.snapshot && onSyncRef.current) {
+                onSyncRef.current(data.snapshot);
+                logActivity(`Loaded document snapshot (${data.snapshot.characters?.length || 0} characters)`, 'sync');
+              }
+
+              // Flush any operations buffered while offline
+              if (offlineQueueRef.current.length > 0) {
+                console.log(`[WebSocket] Flushing ${offlineQueueRef.current.length} offline operations to server...`);
+                while (offlineQueueRef.current.length > 0) {
+                  const queuedOp = offlineQueueRef.current.shift();
+                  ws.send(JSON.stringify(queuedOp));
+                }
+                logActivity('Synchronized offline edits with room', 'sync');
+              }
+            } else if (data.type === 'sync') {
+              if (data.docId === docId && data.snapshot && onSyncRef.current) {
+                onSyncRef.current(data.snapshot);
+                logActivity('Synchronized latest document state from room', 'sync');
+              }
             } else if (data.type === 'op') {
               if (data.docId === docId && data.siteId !== siteId) {
                 if (onRemoteOpRef.current) {
@@ -144,6 +206,7 @@ export function useCollabSocket({
                     name: data.name || `User ${data.siteId}`,
                     color: data.color || '#6366f1',
                     cursor: data.cursor,
+                    status: data.status || 'editing',
                     lastSeen: Date.now(),
                   },
                 }));
@@ -152,24 +215,47 @@ export function useCollabSocket({
                 setCollaborators(prev => {
                   const exists = prev.some(c => c.siteId === data.siteId);
                   if (!exists) {
-                    return [...prev, { siteId: data.siteId, name: data.name, color: data.color, isSelf: false }];
+                    return [...prev, {
+                      siteId: data.siteId,
+                      name: data.name,
+                      color: data.color,
+                      status: data.status || 'online',
+                      lastSeen: Date.now(),
+                      isSelf: false,
+                    }];
                   }
-                  return prev;
+                  return prev.map(c => c.siteId === data.siteId
+                    ? { ...c, status: data.status || c.status, lastSeen: Date.now() }
+                    : c
+                  );
                 });
               }
             } else if (data.type === 'presence') {
               if (data.docId === docId && data.siteId !== siteId) {
-                setCollaborators(prev => {
-                  const filtered = prev.filter(c => c.siteId !== data.siteId);
-                  return [...filtered, {
-                    siteId: data.siteId,
-                    name: data.name,
-                    color: data.color,
-                    isSelf: false,
-                    lastSeen: Date.now(),
-                  }];
-                });
-                logActivity(`${data.name || `User ${data.siteId}`} joined the room`, 'presence');
+                if (data.status === 'offline' || data.event === 'leave') {
+                  // Collaborator disconnected or left room
+                  setCollaborators(prev => prev.filter(c => c.siteId !== data.siteId));
+                  setRemoteCursors(prev => {
+                    const next = { ...prev };
+                    delete next[data.siteId];
+                    return next;
+                  });
+                  logActivity(`${data.name || `User ${data.siteId}`} left the room`, 'presence');
+                } else {
+                  // Active presence update
+                  setCollaborators(prev => {
+                    const filtered = prev.filter(c => c.siteId !== data.siteId);
+                    return [...filtered, {
+                      siteId: data.siteId,
+                      name: data.name,
+                      color: data.color,
+                      status: data.status || 'online',
+                      isSelf: false,
+                      lastSeen: Date.now(),
+                    }];
+                  });
+                  logActivity(`${data.name || `User ${data.siteId}`} joined the room`, 'presence');
+                }
               }
             }
           } catch (err) {
@@ -186,16 +272,12 @@ export function useCollabSocket({
           console.log('[WebSocket] Connection closed.');
           setConnectionStatus('offline');
           setSessionId(null);
-          if (!isCancelled) {
-            reconnectTimeoutRef.current = setTimeout(connect, 2500);
-          }
+          scheduleReconnect();
         };
       } catch (err) {
         console.error('[WebSocket] Connection exception:', err);
         setConnectionStatus('offline');
-        if (!isCancelled) {
-          reconnectTimeoutRef.current = setTimeout(connect, 3000);
-        }
+        scheduleReconnect();
       }
     }
 
@@ -213,10 +295,22 @@ export function useCollabSocket({
       });
     }, 8000);
 
+    // Housekeeping: mark collaborators as idle if inactive > 4s
+    pruneIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      setCollaborators(prev => prev.map(c => {
+        if (c.lastSeen && now - c.lastSeen > 4000 && c.status === 'editing') {
+          return { ...c, status: 'idle' };
+        }
+        return c;
+      }));
+    }, 2000);
+
     return () => {
       isCancelled = true;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (presenceIntervalRef.current) clearInterval(presenceIntervalRef.current);
+      if (pruneIntervalRef.current) clearInterval(pruneIntervalRef.current);
       if (wsRef.current) {
         wsRef.current.close();
       }

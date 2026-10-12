@@ -4,6 +4,7 @@
 #include "LamportClock.hpp"
 #include "Operation.hpp"
 #include "Sequence.hpp"
+#include "DocumentSnapshot.hpp"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -152,6 +153,21 @@ public:
 
     const std::vector<InsertionOp>& getPendingOperations() const {
         return pendingOperations_;
+    }
+
+    DocumentSnapshot createSnapshot(const std::string& docId = "",
+                                   const std::string& title = "") const {
+        return DocumentSnapshot(docId, title, clock_.getTime(), sequence_.getCharacters());
+    }
+
+    void loadSnapshot(const DocumentSnapshot& snapshot) {
+        sequence_.loadCharacters(snapshot.characters);
+        clock_ = LamportClock(snapshot.clock);
+        pendingOperations_.clear();
+    }
+
+    void setClock(uint64_t clk) {
+        clock_ = LamportClock(clk);
     }
 
 private:

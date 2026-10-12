@@ -201,6 +201,20 @@ public:
         return -1;
     }
 
+    /**
+     * @brief Clears all characters from the sequence.
+     */
+    void clear() {
+        elements_.clear();
+    }
+
+    /**
+     * @brief Directly sets the character sequence (used when restoring snapshots).
+     */
+    void loadCharacters(const std::vector<Character>& chars) {
+        elements_ = chars;
+    }
+
 private:
     std::vector<Character> elements_;
 };

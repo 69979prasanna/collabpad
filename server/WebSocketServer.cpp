@@ -198,6 +198,11 @@ shared_ptr<Session> WebSocketServer::doHandshake(uintptr_t clientSockHandle) {
 }
 
 void WebSocketServer::pruneDeadSessions() {
+    for (const auto& s : sessions_) {
+        if (s && !s->isAlive()) {
+            s->close();
+        }
+    }
     sessions_.erase(
         remove_if(sessions_.begin(), sessions_.end(),
             [](const shared_ptr<Session>& s) {

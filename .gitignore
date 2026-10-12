@@ -8,3 +8,6 @@ bin/
 # Node / Frontend
 client/node_modules/
 client/dist/
+
+# Storage data
+data/

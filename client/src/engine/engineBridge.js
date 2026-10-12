@@ -284,4 +284,32 @@ export class EngineBridge {
     }
     return this.sequence.size();
   }
+
+  loadSnapshot(snapshot) {
+    if (!snapshot) return;
+    if (typeof snapshot.clock === 'number') {
+      this.clock = Math.max(this.clock, snapshot.clock);
+    }
+    if (Array.isArray(snapshot.characters)) {
+      this.sequence.elements = snapshot.characters.map(ch => new Character(
+        new CharId(ch.id.siteId, ch.id.clock),
+        new CharId(ch.afterId ? ch.afterId.siteId : 0, ch.afterId ? ch.afterId.clock : 0),
+        ch.value
+      ));
+    }
+    this.pendingOps = [];
+  }
+
+  mergeSnapshot(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.characters)) return;
+    if (typeof snapshot.clock === 'number') {
+      this.clock = Math.max(this.clock, snapshot.clock);
+    }
+    for (const ch of snapshot.characters) {
+      const charId = new CharId(ch.id.siteId, ch.id.clock);
+      if (!this.sequence.contains(charId)) {
+        this.applyOperation(ch);
+      }
+    }
+  }
 }

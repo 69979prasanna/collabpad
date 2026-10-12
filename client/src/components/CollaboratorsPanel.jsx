@@ -52,23 +52,42 @@ export function CollaboratorsPanel({
         </li>
 
         {/* Remote Collaborators */}
-        {collaborators.map((c) => (
-          <li key={c.siteId} className="collaborator-card">
-            <div
-              className="collab-avatar"
-              style={{ backgroundColor: c.color || '#06b6d4' }}
-            >
-              {c.name ? c.name[0].toUpperCase() : 'U'}
-            </div>
-            <div className="collab-info">
-              <div className="collab-name">
-                <span>{c.name || `User ${c.siteId}`}</span>
+        {collaborators.map((c) => {
+          const isEditing = c.status === 'editing';
+          const isIdle = c.status === 'idle';
+          const statusText = isEditing ? 'Typing...' : isIdle ? 'Idle' : 'Active';
+          const statusColor = isEditing ? '#06b6d4' : isIdle ? '#f59e0b' : '#10b981';
+
+          return (
+            <li key={c.siteId} className="collaborator-card">
+              <div
+                className="collab-avatar"
+                style={{ backgroundColor: c.color || '#06b6d4' }}
+              >
+                {c.name ? c.name[0].toUpperCase() : 'U'}
               </div>
-              <div className="collab-site">Site ID: #{c.siteId}</div>
-            </div>
-            <CircleDot size={12} color="#10b981" />
-          </li>
-        ))}
+              <div className="collab-info">
+                <div className="collab-name">
+                  <span>{c.name || `User ${c.siteId}`}</span>
+                  <span
+                    style={{
+                      fontSize: '0.62rem',
+                      color: statusColor,
+                      backgroundColor: `${statusColor}22`,
+                      padding: '1px 5px',
+                      borderRadius: 3,
+                      marginLeft: 4,
+                    }}
+                  >
+                    {statusText}
+                  </span>
+                </div>
+                <div className="collab-site">Site ID: #{c.siteId}</div>
+              </div>
+              <CircleDot size={12} color={statusColor} />
+            </li>
+          );
+        })}
       </ul>
 
       {/* Operation Activity Stream */}

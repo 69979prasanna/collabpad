@@ -59,7 +59,19 @@ export default function App() {
     const applied = engineRef.current.applyOperation(rawOp);
     const newText = engineRef.current.getText();
     setText(newText);
-    setPendingCount(engineRef.current.sequence ? engineRef.current.sequence.size() : 0);
+    setPendingCount(engineRef.current.pendingOps ? engineRef.current.pendingOps.length : 0);
+    isRemoteUpdatingRef.current = false;
+  }, []);
+
+  // Handler for initial or reconnection document snapshot synchronization
+  const handleSync = useCallback((snapshot) => {
+    if (!engineRef.current || !snapshot) return;
+
+    isRemoteUpdatingRef.current = true;
+    engineRef.current.loadSnapshot(snapshot);
+    const newText = engineRef.current.getText();
+    setText(newText);
+    setPendingCount(engineRef.current.pendingOps ? engineRef.current.pendingOps.length : 0);
     isRemoteUpdatingRef.current = false;
   }, []);
 
@@ -78,6 +90,7 @@ export default function App() {
     siteId,
     userName,
     onRemoteOp: handleRemoteOp,
+    onSync: handleSync,
   });
 
   // Local text modification handler: converts textarea changes into RGA operations

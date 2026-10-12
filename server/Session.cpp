@@ -75,6 +75,27 @@ static string jsonGetString(const string& json, const string& key) {
     return val;
 }
 
+// Returns the integer value of "key": 123 in json.
+static uint64_t jsonGetInt(const string& json, const string& key) {
+    string needle = "\"" + key + "\"";
+    size_t kpos = json.find(needle);
+    if (kpos == string::npos) return 0;
+
+    size_t colon = json.find(':', kpos + needle.size());
+    if (colon == string::npos) return 0;
+
+    size_t vstart = colon + 1;
+    while (vstart < json.size() && (json[vstart] == ' ' || json[vstart] == '\t')) {
+        ++vstart;
+    }
+    uint64_t val = 0;
+    while (vstart < json.size() && isdigit(static_cast<unsigned char>(json[vstart]))) {
+        val = val * 10 + (json[vstart] - '0');
+        ++vstart;
+    }
+    return val;
+}
+
 // --------------------------------------------------------------------------
 // Session
 // --------------------------------------------------------------------------
@@ -87,10 +108,12 @@ Session::~Session() {
 }
 
 void Session::close() {
-    if (!alive_.exchange(false)) return; // already closed
+    if (closed_.exchange(true)) return; // already closed
+    alive_ = false;
 
     if (!docId_.empty()) {
         hub_->leave(docId_, sessionId_);
+        docId_.clear();
     }
 
     // Send a WebSocket close frame (opcode 0x8, no payload)
@@ -249,6 +272,16 @@ void Session::handleMessage(const string& json) {
         handleJoin(json);
     } else if (type == "op" || type == "cursor" || type == "presence") {
         handleOperation(json);
+    } else if (type == "sync_req" || type == "load") {
+        if (!docId_.empty()) {
+            DocumentSnapshot snap = hub_->getSnapshot(docId_);
+            send("{\"type\":\"sync\",\"docId\":\"" + docId_ + "\",\"snapshot\":" + snap.toJson() + "}");
+        }
+    } else if (type == "save") {
+        if (!docId_.empty()) {
+            bool ok = hub_->saveDocument(docId_);
+            send("{\"type\":\"saved\",\"docId\":\"" + docId_ + "\",\"status\":\"" + (ok ? "ok" : "error") + "\"}");
+        }
     } else {
         cerr << "[Session " << sessionId_ << "] Unknown message type \""
              << type << "\", ignoring.\n";
@@ -273,18 +306,27 @@ void Session::handleJoin(const string& fullJson) {
         }
     }
 
+    siteId_ = static_cast<uint32_t>(jsonGetInt(fullJson, "siteId"));
+    userName_ = jsonGetString(fullJson, "name");
+    if (userName_.empty()) {
+        userName_ = "User " + to_string(siteId_);
+    }
+
     // Leave previous doc if already joined
     if (!docId_.empty() && docId_ != newDocId) {
         hub_->leave(docId_, sessionId_);
     }
     docId_ = newDocId;
-    hub_->join(docId_, shared_from_this());
+    DocumentSnapshot snap = hub_->join(docId_, shared_from_this(), siteId_, userName_);
 
-    // Send acknowledgement back to the joining client
+    // Send acknowledgement back to the joining client including document snapshot for state recovery
     string ack = "{\"type\":\"joined\",\"docId\":\"" + docId_ + "\",\"sessionId\":"
-               + to_string(sessionId_) + "}";
+               + to_string(sessionId_) + ",\"title\":\"" + snap.title + "\","
+               + "\"clock\":" + to_string(snap.clock) + ","
+               + "\"snapshot\":" + snap.toJson() + "}";
     send(ack);
-    cout << "[Session " << sessionId_ << "] Joined doc \"" << docId_ << "\"\n";
+    cout << "[Session " << sessionId_ << "] Joined doc \"" << docId_
+         << "\" (Site #" << siteId_ << ", name: \"" << userName_ << "\")\n";
 }
 
 void Session::handleOperation(const string& fullJson) {

@@ -43,6 +43,8 @@ public:
     const std::string& docId() const { return docId_; }
 
     uint32_t id() const { return sessionId_; }
+    uint32_t siteId() const { return siteId_; }
+    const std::string& userName() const { return userName_; }
 
     // The raw socket file descriptor — needed by WebSocketServer for select().
     uintptr_t sockFd() const { return sock_; }
@@ -63,8 +65,11 @@ private:
     uintptr_t sock_;
     std::shared_ptr<DocumentHub> hub_;
     uint32_t sessionId_;
+    uint32_t siteId_{0};
+    std::string userName_;
     std::string docId_;       // empty until "join" is received
     std::atomic<bool> alive_{true};
+    std::atomic<bool> closed_{false};
 };
 
 } // namespace collabpad

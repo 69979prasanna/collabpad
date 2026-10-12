@@ -33,6 +33,7 @@ add_executable(collabpad_server
     server/WebSocketServer.cpp
     server/Session.cpp
     server/DocumentHub.cpp
+    server/FileRepository.cpp
 )
 target_include_directories(collabpad_server PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/server

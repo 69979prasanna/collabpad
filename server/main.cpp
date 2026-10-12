@@ -9,6 +9,7 @@
 
 #include "WebSocketServer.hpp"
 #include "DocumentHub.hpp"
+#include "FileRepository.hpp"
 
 #include <iostream>
 #include <memory>
@@ -18,20 +19,16 @@
 using namespace std;
 
 // Global flag so Ctrl+C can gracefully stop the server.
-// Using a volatile sig_atomic_t is the correct POSIX way to handle signals.
 static volatile sig_atomic_t g_stopRequested = 0;
 
-static void signalHandler(int /*sig*/) {
-    g_stopRequested = 1;
-}
-
-// We keep a global pointer to the server so the signal handler can stop it.
-// This is the only global mutable state in the server, justified by the
-// requirement that signal handlers cannot easily communicate any other way.
 static collabpad::WebSocketServer* g_server = nullptr;
+static shared_ptr<collabpad::DocumentHub> g_hub = nullptr;
 
 static void onSignal(int sig) {
     cout << "\n[Main] Signal " << sig << " received. Stopping server...\n";
+    if (g_hub) {
+        g_hub->flushAll();
+    }
     if (g_server) {
         g_server->stop();
     }
@@ -40,6 +37,8 @@ static void onSignal(int sig) {
 
 int main(int argc, char* argv[]) {
     uint16_t port = 8080;
+    string dataDir = "data/documents";
+
     if (argc >= 2) {
         int p = atoi(argv[1]);
         if (p > 0 && p <= 65535) {
@@ -49,20 +48,27 @@ int main(int argc, char* argv[]) {
                  << ". Using default 8080.\n";
         }
     }
+    if (argc >= 3) {
+        dataDir = argv[2];
+    }
 
     cout << "========================================\n"
-         << "  CollabPad WebSocket Server  (Phase 3)\n"
+         << "  CollabPad Real-Time Server  (Phase 5)\n"
          << "========================================\n";
 
     // Set up Ctrl+C handler
     signal(SIGINT, onSignal);
 
-    auto hub = make_shared<collabpad::DocumentHub>();
+    auto repository = make_shared<collabpad::FileRepository>(dataDir);
+    auto hub = make_shared<collabpad::DocumentHub>(repository);
+    g_hub = hub;
+
     collabpad::WebSocketServer server(port, hub);
     g_server = &server;
 
     server.run(); // blocks until stop() is called
 
+    hub->flushAll();
     cout << "[Main] Server exited cleanly.\n";
     return 0;
 }
