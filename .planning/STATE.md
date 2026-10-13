@@ -1,9 +1,10 @@
 # Project State & Memory
 
 ## Current Position
-- **Active Milestone**: `Milestone 1` completed & verified -> transitioning to `Milestone 2` (Production Hardening & Advanced CRDT).
-- **Current Phase**: `Phase 5` completed (Git commit `af162db`).
-- **Next Phase in Queue**: `Phase 6` (RGA Deletion & Tombstone Tracking).
+- **Active Milestone**: `Milestone 2` (Production Hardening & Advanced CRDT).
+- **Current Phase**: `Phase 6` (RGA Deletion & Tombstone Tracking) — **PLANNED**.
+- **Phase 6 Plan**: [.planning/phases/06-rga-deletion-tombstones/PLAN.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/phases/06-rga-deletion-tombstones/PLAN.md)
+- **Phase 6 Research**: [.planning/phases/06-rga-deletion-tombstones/RESEARCH.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/phases/06-rga-deletion-tombstones/RESEARCH.md)
 - **Codebase Mapping**: Completed & committed (`0d229df` in `.planning/codebase/`).
 
 ---
