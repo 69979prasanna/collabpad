@@ -7,5 +7,9 @@ export default defineConfig({
   server: {
     port: 3000,
     open: false,
+    allowedHosts: [
+      'roots-engineer-move-maintain.trycloudflare.com',
+      '*.trycloudflare.com',
+    ],
   },
 });

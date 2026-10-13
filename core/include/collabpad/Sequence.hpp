@@ -14,14 +14,18 @@ struct Character {
     CharId id;
     CharId afterId{CharId::root()};
     char value{'\0'};
+    bool isDeleted{false};
 
     Character() = default;
 
     Character(CharId charId, char val)
-        : id(charId), afterId(CharId::root()), value(val) {}
+        : id(charId), afterId(CharId::root()), value(val), isDeleted(false) {}
 
     Character(CharId charId, CharId parentId, char val)
-        : id(charId), afterId(parentId), value(val) {}
+        : id(charId), afterId(parentId), value(val), isDeleted(false) {}
+
+    Character(CharId charId, CharId parentId, char val, bool del)
+        : id(charId), afterId(parentId), value(val), isDeleted(del) {}
 };
 
 class Sequence {
@@ -52,21 +56,46 @@ public:
         return contains(id);
     }
 
+    /**
+     * @brief Returns the visible text of the sequence, excluding deleted characters.
+     */
     std::string getText() const {
         std::string text;
         text.reserve(elements_.size());
         for (const auto& ch : elements_) {
-            text.push_back(ch.value);
+            if (!ch.isDeleted) {
+                text.push_back(ch.value);
+            }
         }
         return text;
     }
 
+    /**
+     * @brief Total number of character nodes (including tombstones) in the RGA.
+     */
     size_t size() const {
         return elements_.size();
     }
 
+    /**
+     * @brief Number of visible (non-deleted) characters in the document.
+     */
+    size_t visibleSize() const {
+        size_t count = 0;
+        for (const auto& ch : elements_) {
+            if (!ch.isDeleted) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
     bool empty() const {
         return elements_.empty();
+    }
+
+    bool visibleEmpty() const {
+        return visibleSize() == 0;
     }
 
     const std::vector<Character>& getCharacters() const {
@@ -170,29 +199,98 @@ public:
     /**
      * @brief Inserts a character after a specified parent ID using RGA ordering.
      */
-    bool insertAfter(const CharId& id, const CharId& afterId, char value) {
+    bool insertAfter(const CharId& id, const CharId& afterId, char value, bool isDeleted = false) {
         if (contains(id)) {
             return false;
         }
         size_t index = findInsertIndex(id, afterId);
-        elements_.insert(elements_.begin() + index, Character{id, afterId, value});
+        elements_.insert(elements_.begin() + index, Character{id, afterId, value, isDeleted});
         return true;
     }
 
     /**
-     * @brief Gets the CharId of the character at the specified 0-based visual index.
+     * @brief Marks a character as deleted (tombstone).
+     * Idempotent: returns true if newly marked deleted, false if not found or already deleted.
      */
-    CharId getIdAt(size_t index) const {
-        if (index < elements_.size()) {
-            return elements_[index].id;
+    bool markDeleted(const CharId& id) {
+        if (id.isRoot()) {
+            return false;
+        }
+        for (auto& ch : elements_) {
+            if (ch.id == id) {
+                if (ch.isDeleted) {
+                    return false; // Already deleted
+                }
+                ch.isDeleted = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @brief Checks whether a character has been marked as a tombstone.
+     */
+    bool isTombstone(const CharId& id) const {
+        if (id.isRoot()) {
+            return false;
+        }
+        for (const auto& ch : elements_) {
+            if (ch.id == id) {
+                return ch.isDeleted;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @brief Gets the CharId of the character at the specified 0-based VISIBLE index,
+     * skipping any deleted characters (tombstones).
+     */
+    CharId getIdAt(size_t visualIndex) const {
+        size_t current = 0;
+        for (const auto& ch : elements_) {
+            if (!ch.isDeleted) {
+                if (current == visualIndex) {
+                    return ch.id;
+                }
+                ++current;
+            }
         }
         return CharId::root();
     }
 
     /**
-     * @brief Finds the visual index of a character by its CharId.
+     * @brief Gets the CharId of the character at the specified raw physical vector index.
+     */
+    CharId getPhysicalIdAt(size_t physicalIndex) const {
+        if (physicalIndex < elements_.size()) {
+            return elements_[physicalIndex].id;
+        }
+        return CharId::root();
+    }
+
+    /**
+     * @brief Finds the 0-based VISIBLE index of a character by its CharId.
+     * Returns -1 if the character is not found or has been marked as a tombstone.
      */
     int findIndex(const CharId& id) const {
+        int visualIdx = 0;
+        for (const auto& ch : elements_) {
+            if (ch.id == id) {
+                return ch.isDeleted ? -1 : visualIdx;
+            }
+            if (!ch.isDeleted) {
+                ++visualIdx;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * @brief Finds the raw physical vector index of a character by its CharId.
+     */
+    int findPhysicalIndex(const CharId& id) const {
         for (size_t i = 0; i < elements_.size(); ++i) {
             if (elements_[i].id == id) {
                 return static_cast<int>(i);

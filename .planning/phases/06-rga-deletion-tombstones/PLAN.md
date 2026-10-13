@@ -44,8 +44,9 @@
 #### Task 1.3: Document Snapshot Serialization
 - **Target File**: `core/include/collabpad/DocumentSnapshot.hpp`
 - **Changes**:
-  1. In `toJson()`: Add `"deleted":` boolean field for each character object.
-  2. In `fromJson()`: Parse `"deleted"` sub-field if present (default to `false` if omitted for backwards compatibility with pre-Phase 6 JSON files).
+  1. In `toJson()`: Add `"deleted":` boolean field for each character object in `"characters"`, and add `"pendingDeletions": [ {"siteId": ..., "clock": ...}, ... ]` array capturing any buffered deletes whose targets have not arrived.
+  2. In `fromJson()`: Parse `"deleted"` sub-field if present (defaulting to `false` if omitted for backwards compatibility) and parse `"pendingDeletions"` array (empty if omitted).
+  3. In `Replica::loadSnapshot()`: Restore `pendingDeletions_` buffer from the snapshot so that pending deletes survive server crash and restart recovery.
 
 ---
 
@@ -56,10 +57,10 @@
 - **Changes**:
   1. Update `applyOpJson(DocumentRoom& room, const string& json)`:
      - Detect if `op` is a delete operation (check for `"type": "delete"` or presence of `"targetId"`).
-     - If delete: parse `targetId.siteId` and `targetId.clock`, construct `DeletionOp`, and call `room.replica->applyDelete(op)`.
-     - Set `room.isDirty = true` and invoke `repository_->save(...)` to persist updated snapshot with tombstones.
+     - If delete: parse the deletion's own `siteId` and `clock` (advancing the server replica's clock via `clock_.update(op.clock)`) and parse `targetId.siteId` and `targetId.clock`. Construct `DeletionOp(targetId, opSite, opClock)` and call `room.replica->applyDelete(op)`.
+     - Set `room.isDirty = true` and invoke `repository_->save(...)` to persist updated snapshot with tombstones and durable `pendingDeletions`.
   2. In `broadcast()`:
-     - Relay delete operations to all other connected sessions in the room (non-echo fanout).
+     - Relay delete operations (carrying `siteId`, `clock`, and `targetId`) to all other connected sessions in the room (non-echo fanout).
 
 ---
 
@@ -77,8 +78,8 @@
      - Add `visibleSize()` / update `size()`
   3. In `EngineBridge`:
      - Implement `localDelete(targetId)`
-     - Implement `applyDelete(op)`
-     - Update `applyOperation(rawOp)`: branch on `rawOp.type === 'delete'` to invoke `applyDelete`
+     - Implement `applyDelete(op)`: advance clock via `updateClock(op.clock)`, apply `markDeleted`, or buffer in `pendingDeletions`
+     - Update `applyOperation(rawOp)`: branch on `rawOp.type === 'delete'` to parse `rawOp.siteId`, `rawOp.clock`, and `rawOp.targetId`, advancing clock and invoking `applyDelete`
      - Buffer out-of-order deletes in `pendingDeletions`
 
 #### Task 3.2: Frontend Text Diffing in `App.jsx`
@@ -91,10 +92,12 @@
        - Iterate through deleted characters from visual index `prefix + deletedCount - 1` down to `prefix`:
          - Retrieve `targetId = engineRef.current.getIdAt(i)`.
          - Execute `delOp = engineRef.current.localDelete(targetId)`.
-         - Transmit operation over WebSocket:
+         - Transmit operation over WebSocket carrying the deletion's own timestamp and target:
            ```javascript
            sendOperation({
              type: 'delete',
+             siteId: delOp.siteId,
+             clock: delOp.clock,
              targetId: { siteId: delOp.targetId.siteId, clock: delOp.targetId.clock }
            });
            ```

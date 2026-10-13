@@ -9,12 +9,12 @@ CollabPad was successfully onboarded into the GSD planning system. The brownfiel
 
 | Artifact | Purpose | Location |
 |---|---|---|
-| **Codebase Map** | 7 structured documents covering stack, architecture, conventions, and debt | `.planning/codebase/` |
-| **Project Context** | High-level problem statement, architectural principles, and component inventory | [PROJECT.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/PROJECT.md) |
-| **Requirements Matrix** | Implemented (v1.0) and planned (v1.1) functional & non-functional requirements | [REQUIREMENTS.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/REQUIREMENTS.md) |
-| **Roadmap** | Milestone 1 (Phases 1–5 completed) and Milestone 2 (Phases 6–10 planned) | [ROADMAP.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/ROADMAP.md) |
-| **Project Memory & State**| Architectural decision records (ADRs), current position, and next action | [STATE.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/STATE.md) |
-| **Configuration** | GSD workflow preferences | [config.json](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/config.json) |
+| **Codebase Map** | 7 structured documents covering stack, architecture, conventions, and debt | [../codebase/](../codebase/) |
+| **Project Context** | High-level problem statement, architectural principles, and component inventory | [PROJECT.md](../PROJECT.md) |
+| **Requirements Matrix** | Implemented (v1.0) and planned (v1.1) functional & non-functional requirements | [REQUIREMENTS.md](../REQUIREMENTS.md) |
+| **Roadmap** | Milestone 1 (Phases 1–5 completed) and Milestone 2 (Phases 6–10 planned) | [ROADMAP.md](../ROADMAP.md) |
+| **Project Memory & State**| Architectural decision records (ADRs), current position, and next action | [STATE.md](../STATE.md) |
+| **Configuration** | GSD workflow preferences | [config.json](../config.json) |
 
 ---
 

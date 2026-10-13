@@ -87,9 +87,13 @@ Consider two replicas, $R_A$ and $R_B$, synchronized with text `"CAT"`:
 
 #### 4. `DocumentSnapshot.hpp`
 - Update JSON serialization:
-  - Add `"deleted": true/false` to character JSON object.
+  - Add `"deleted": true/false` to character JSON objects in `"characters"`.
+  - Add `"pendingDeletions": [ {"siteId": ..., "clock": ...}, ... ]` array to durably preserve pending deletes whose targets have not arrived over the network.
 - Update JSON parser `fromJson`:
-  - Extract `"deleted"` if present (default to `false` if omitted for backwards compatibility with pre-Phase 6 JSON files).
+  - Extract `"deleted"` if present on character objects (defaulting to `false` if omitted for backwards compatibility).
+  - Extract `"pendingDeletions"` array (defaulting to empty if omitted).
+- Update `Replica::loadSnapshot`:
+  - Restore `pendingDeletions_` buffer from the snapshot, ensuring out-of-order deletes survive server restarts and crash recovery.
 
 ---
 
@@ -153,7 +157,7 @@ Consider two replicas, $R_A$ and $R_B$, synchronized with text `"CAT"`:
 
 1. **Phase 1–5 Tests Untouched**: All existing tests (`collabpad_demo.exe`, `collabpad_phase2_demo.exe`, `test_phase5.py`) only perform insertions and will continue to pass without modification.
 2. **Persistence Schema Compatibility**: Older snapshots without `"deleted"` fields parse cleanly with `deleted = false`.
-3. **Wire Protocol Compatibility**: Existing insertion operations remain identical. Delete operations use a tagged format:
+3. **Wire Protocol Compatibility**: Existing insertion operations remain identical. Delete operations carry their own `siteId` and Lamport `clock` distinct from the target character's identifier:
    ```json
    {
      "type": "op",
@@ -161,6 +165,8 @@ Consider two replicas, $R_A$ and $R_B$, synchronized with text `"CAT"`:
      "siteId": 142,
      "op": {
        "type": "delete",
+       "siteId": 142,
+       "clock": 8,
        "targetId": { "siteId": 142, "clock": 5 }
      }
    }

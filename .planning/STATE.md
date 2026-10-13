@@ -3,9 +3,9 @@
 ## Current Position
 - **Active Milestone**: `Milestone 2` (Production Hardening & Advanced CRDT).
 - **Current Phase**: `Phase 6` (RGA Deletion & Tombstone Tracking) — **PLANNED**.
-- **Phase 6 Plan**: [.planning/phases/06-rga-deletion-tombstones/PLAN.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/phases/06-rga-deletion-tombstones/PLAN.md)
-- **Phase 6 Research**: [.planning/phases/06-rga-deletion-tombstones/RESEARCH.md](file:///c:/Users/prasa/Videos/newcode/collabpad/.planning/phases/06-rga-deletion-tombstones/RESEARCH.md)
-- **Codebase Mapping**: Completed & committed (`0d229df` in `.planning/codebase/`).
+- **Phase 6 Plan**: [PLAN.md](phases/06-rga-deletion-tombstones/PLAN.md)
+- **Phase 6 Research**: [RESEARCH.md](phases/06-rga-deletion-tombstones/RESEARCH.md)
+- **Codebase Mapping**: Completed & committed (`0d229df` in [codebase/](codebase/)).
 
 ---
 
