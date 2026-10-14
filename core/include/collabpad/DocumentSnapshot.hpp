@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CharId.hpp"
+#include "Operation.hpp"
 #include "Sequence.hpp"
 #include <cstdint>
 #include <string>
@@ -13,25 +14,30 @@ namespace collabpad {
 /**
  * @brief Represents a persistent snapshot of an RGA collaborative document.
  * Contains all necessary metadata and character nodes (IDs, ordering parent IDs,
- * character values) required to deterministically reconstruct a CRDT replica.
+ * character values, tombstone deletion flags) and pending deletions required to
+ * deterministically reconstruct a CRDT replica.
  */
 struct DocumentSnapshot {
     std::string docId;
     std::string title;
     uint64_t clock{0};
     std::vector<Character> characters;
+    std::vector<DeletionOp> pendingDeletions;
 
     DocumentSnapshot() = default;
 
     DocumentSnapshot(const std::string& id, const std::string& docTitle,
-                     uint64_t clk, const std::vector<Character>& chars)
-        : docId(id), title(docTitle), clock(clk), characters(chars) {}
+                     uint64_t clk, const std::vector<Character>& chars,
+                     const std::vector<DeletionOp>& pendingDels = {})
+        : docId(id), title(docTitle), clock(clk), characters(chars), pendingDeletions(pendingDels) {}
 
     std::string getText() const {
         std::string s;
         s.reserve(characters.size());
         for (const auto& ch : characters) {
-            s.push_back(ch.value);
+            if (!ch.isDeleted) {
+                s.push_back(ch.value);
+            }
         }
         return s;
     }
@@ -53,9 +59,19 @@ struct DocumentSnapshot {
                << ",\"clock\":" << ch.id.clock << "},"
                << "\"afterId\":{\"siteId\":" << ch.afterId.siteId
                << ",\"clock\":" << ch.afterId.clock << "},"
-               << "\"value\":\"" << escapeChar(ch.value) << "\"}";
+               << "\"value\":\"" << escapeChar(ch.value) << "\","
+               << "\"deleted\":" << (ch.isDeleted ? "true" : "false") << "}";
         }
 
+        ss << "],\"pendingDeletions\":[";
+        for (size_t i = 0; i < pendingDeletions.size(); ++i) {
+            if (i > 0) ss << ",";
+            const auto& del = pendingDeletions[i];
+            ss << "{\"targetId\":{\"siteId\":" << del.targetId.siteId
+               << ",\"clock\":" << del.targetId.clock << "},"
+               << "\"siteId\":" << del.siteId
+               << ",\"clock\":" << del.clock << "}";
+        }
         ss << "]}";
         return ss.str();
     }
@@ -121,9 +137,58 @@ struct DocumentSnapshot {
             ch.afterId.siteId = static_cast<uint32_t>(extractSubFieldUint64(itemJson, "afterId", "siteId"));
             ch.afterId.clock = extractSubFieldUint64(itemJson, "afterId", "clock");
             ch.value = extractCharValue(itemJson, "value");
+            ch.isDeleted = extractBool(itemJson, "deleted");
 
             out.characters.push_back(ch);
             pos = objEnd + 1;
+        }
+
+        // Parse "pendingDeletions":[ ... ] if present
+        out.pendingDeletions.clear();
+        size_t pendPos = json.find("\"pendingDeletions\"");
+        if (pendPos != std::string::npos) {
+            size_t pOpen = json.find('[', pendPos);
+            if (pOpen != std::string::npos) {
+                size_t pPos = pOpen + 1;
+                while (pPos < json.size()) {
+                    size_t nextObj = json.find('{', pPos);
+                    if (nextObj == std::string::npos) break;
+
+                    size_t closeBracket = json.find(']', pPos);
+                    if (closeBracket != std::string::npos && closeBracket < nextObj) {
+                        break;
+                    }
+
+                    int depth = 0;
+                    size_t objEnd = nextObj;
+                    for (size_t i = nextObj; i < json.size(); ++i) {
+                        if (json[i] == '{') depth++;
+                        else if (json[i] == '}') {
+                            depth--;
+                            if (depth == 0) {
+                                objEnd = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    std::string itemJson = json.substr(nextObj, objEnd - nextObj + 1);
+
+                    DeletionOp del;
+                    if (itemJson.find("\"targetId\"") != std::string::npos) {
+                        del.targetId.siteId = static_cast<uint32_t>(extractSubFieldUint64(itemJson, "targetId", "siteId"));
+                        del.targetId.clock = extractSubFieldUint64(itemJson, "targetId", "clock");
+                    } else {
+                        del.targetId.siteId = static_cast<uint32_t>(extractUint64(itemJson, "siteId"));
+                        del.targetId.clock = extractUint64(itemJson, "clock");
+                    }
+                    del.siteId = static_cast<uint32_t>(extractUint64(itemJson, "siteId"));
+                    del.clock = extractUint64(itemJson, "clock");
+
+                    out.pendingDeletions.push_back(del);
+                    pPos = objEnd + 1;
+                }
+            }
         }
 
         return true;
@@ -250,6 +315,24 @@ private:
             return json[vstart];
         }
         return '\0';
+    }
+
+    static bool extractBool(const std::string& json, const std::string& key) {
+        std::string needle = "\"" + key + "\"";
+        size_t kpos = json.find(needle);
+        if (kpos == std::string::npos) return false;
+
+        size_t colon = json.find(':', kpos + needle.size());
+        if (colon == std::string::npos) return false;
+
+        size_t vstart = colon + 1;
+        while (vstart < json.size() && (json[vstart] == ' ' || json[vstart] == '\t')) {
+            ++vstart;
+        }
+        if (vstart + 4 <= json.size() && json.substr(vstart, 4) == "true") {
+            return true;
+        }
+        return false;
     }
 };
 

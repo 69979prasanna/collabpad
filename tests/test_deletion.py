@@ -288,6 +288,49 @@ async def run_deletion_tests():
             check("Tombstones are retained on disk with deleted=True", len(tombstones) == 2)
             check("No ghost characters reappeared after restart", "HELLO" not in vis_text_after_restart)
 
+        # =====================================================================
+        # Case 7: Legacy document compatibility (snapshots without deletion metadata)
+        # =====================================================================
+        print("\n=== Test 7: Legacy document without deletion metadata loads with characters visible ===")
+        legacy_path = os.path.join(TEST_DATA_DIR, "doc-legacy.json")
+        legacy_content = {
+            "docId": "doc-legacy",
+            "title": "Legacy Doc",
+            "clock": 3,
+            "characters": [
+                {"id": {"siteId": 1, "clock": 1}, "afterId": {"siteId": 0, "clock": 0}, "value": "O"},
+                {"id": {"siteId": 1, "clock": 2}, "afterId": {"siteId": 1, "clock": 1}, "value": "L"},
+                {"id": {"siteId": 1, "clock": 3}, "afterId": {"siteId": 1, "clock": 2}, "value": "D"}
+            ]
+        }
+        with open(legacy_path, "w", encoding="utf-8") as f:
+            json.dump(legacy_content, f)
+
+        async with websockets.connect(URI) as clientLegacy:
+            await clientLegacy.send(json.dumps({"type": "join", "docId": "doc-legacy", "siteId": 9, "name": "Ian"}))
+            ack_legacy = await try_recv(clientLegacy)
+            check("Client joins legacy document without deletion metadata", ack_legacy and "snapshot" in ack_legacy)
+            snap_legacy = json.loads(ack_legacy).get("snapshot", {})
+            legacy_text = get_visible_text(snap_legacy.get("characters", []))
+            check("Legacy document characters are visible by default ('OLD')", legacy_text == "OLD", f"Got: '{legacy_text}'")
+
+            # Delete 'L' from legacy document
+            del_legacy_op = {
+                "type": "delete",
+                "siteId": 9,
+                "clock": 4,
+                "targetId": {"siteId": 1, "clock": 2}
+            }
+            await clientLegacy.send(json.dumps({"type": "op", "docId": "doc-legacy", "siteId": 9, "op": del_legacy_op}))
+            await asyncio.sleep(0.3)
+
+        async with websockets.connect(URI) as clientLegacyCheck:
+            await clientLegacyCheck.send(json.dumps({"type": "join", "docId": "doc-legacy", "siteId": 10, "name": "Jack"}))
+            ack_check = json.loads(await try_recv(clientLegacyCheck))
+            snap_check = ack_check.get("snapshot", {})
+            updated_legacy_text = get_visible_text(snap_check.get("characters", []))
+            check("Legacy document deletion works and converges to 'OD'", updated_legacy_text == "OD", f"Got: '{updated_legacy_text}'")
+
     finally:
         stop_server_process(server_proc)
 

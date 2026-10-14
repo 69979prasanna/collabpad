@@ -140,8 +140,8 @@
 
 ## Verification Criteria & Acceptance Tests
 
-- [ ] `collabpad_phase6_demo.exe` builds and exits with code 0.
-- [ ] `python tests/test_deletion.py 8096` passes all deletion, convergence, and persistence tests.
-- [ ] `python tests/test_phase5.py 8095` continues to pass with 10/10 tests green.
-- [ ] `collabpad_phase2_demo.exe` and `collabpad_demo.exe` continue to exit with code 0.
-- [ ] Deleted characters in browser client no longer ghost back upon subsequent edits.
+- [x] `collabpad_phase6_demo.exe` builds and exits with code 0 (all 6 cases passed).
+- [x] `python tests/test_deletion.py 8096` passes all deletion, convergence, and persistence tests (7/7 passed).
+- [x] `python tests/test_phase5.py 8095` continues to pass with 10/10 tests green.
+- [x] `collabpad_phase2_demo.exe` and `collabpad_demo.exe` continue to exit with code 0.
+- [x] Deleted characters in browser client no longer ghost back upon subsequent edits.

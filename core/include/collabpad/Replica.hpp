@@ -109,6 +109,7 @@ public:
 
         // Parent is present (or inserting after root)
         sequence_.insertAfter(op.id, op.afterId, op.value);
+        checkPendingDeletion(op.id);
 
         // Try applying any buffered operations that were waiting on this character
         tryApplyPending();
@@ -124,6 +125,67 @@ public:
     }
 
     // =========================================================================
+    // Phase 6: RGA Deletion & Tombstone API
+    // =========================================================================
+
+    /**
+     * @brief Creates and applies a local deletion operation for the specified character ID.
+     * @param targetId The CharId of the character node to tombstone.
+     * @return The created DeletionOp.
+     */
+    DeletionOp localDelete(const CharId& targetId) {
+        if (targetId.isRoot()) {
+            return DeletionOp{};
+        }
+        uint64_t timestamp = clock_.tick();
+        sequence_.markDeleted(targetId);
+        return DeletionOp{targetId, siteId_, timestamp};
+    }
+
+    /**
+     * @brief Creates and applies a local deletion operation at a 0-based visual index.
+     * Resolves the visual index to CharId (skipping tombstones), then calls localDelete.
+     * @param visualIndex The 0-based visual index of the character to delete.
+     * @return The created DeletionOp (or empty DeletionOp if index out of bounds).
+     */
+    DeletionOp localDeleteAt(size_t visualIndex) {
+        CharId targetId = sequence_.getIdAt(visualIndex);
+        if (targetId.isRoot()) {
+            return DeletionOp{};
+        }
+        return localDelete(targetId);
+    }
+
+    /**
+     * @brief Applies a deletion operation (local or remote) to this replica.
+     * Advances the Lamport clock.
+     * If the target character is present in the sequence, marks it as a tombstone.
+     * If the target character has not yet arrived (out-of-order delivery), buffers
+     * the deletion in pendingDeletions_ to be applied once the target is inserted.
+     * @param op The deletion operation.
+     * @return true if character was immediately tombstoned, false if buffered or already deleted.
+     */
+    bool applyDelete(const DeletionOp& op) {
+        if (op.targetId.isRoot()) {
+            return false;
+        }
+        clock_.update(op.clock);
+
+        if (sequence_.contains(op.targetId)) {
+            return sequence_.markDeleted(op.targetId);
+        }
+
+        // Target character has not arrived yet: buffer the deletion
+        for (const auto& pending : pendingDeletions_) {
+            if (pending.targetId == op.targetId) {
+                return false; // Already buffered
+            }
+        }
+        pendingDeletions_.push_back(op);
+        return false;
+    }
+
+    // =========================================================================
     // Inspection & Accessors
     // =========================================================================
 
@@ -133,6 +195,14 @@ public:
 
     std::string getText() const {
         return sequence_.getText();
+    }
+
+    size_t visibleSize() const {
+        return sequence_.visibleSize();
+    }
+
+    bool visibleEmpty() const {
+        return sequence_.visibleEmpty();
     }
 
     const Sequence& getSequence() const {
@@ -155,15 +225,28 @@ public:
         return pendingOperations_;
     }
 
+    bool hasPendingDeletions() const {
+        return !pendingDeletions_.empty();
+    }
+
+    size_t getPendingDeletionCount() const {
+        return pendingDeletions_.size();
+    }
+
+    const std::vector<DeletionOp>& getPendingDeletions() const {
+        return pendingDeletions_;
+    }
+
     DocumentSnapshot createSnapshot(const std::string& docId = "",
                                    const std::string& title = "") const {
-        return DocumentSnapshot(docId, title, clock_.getTime(), sequence_.getCharacters());
+        return DocumentSnapshot(docId, title, clock_.getTime(), sequence_.getCharacters(), pendingDeletions_);
     }
 
     void loadSnapshot(const DocumentSnapshot& snapshot) {
         sequence_.loadCharacters(snapshot.characters);
         clock_ = LamportClock(snapshot.clock);
         pendingOperations_.clear();
+        pendingDeletions_ = snapshot.pendingDeletions;
     }
 
     void setClock(uint64_t clk) {
@@ -184,6 +267,7 @@ private:
                     InsertionOp op = *it;
                     it = pendingOperations_.erase(it);
                     sequence_.insertAfter(op.id, op.afterId, op.value);
+                    checkPendingDeletion(op.id);
                     progress = true;
                 } else {
                     ++it;
@@ -192,10 +276,21 @@ private:
         }
     }
 
+    void checkPendingDeletion(const CharId& id) {
+        for (auto it = pendingDeletions_.begin(); it != pendingDeletions_.end(); ++it) {
+            if (it->targetId == id) {
+                sequence_.markDeleted(id);
+                pendingDeletions_.erase(it);
+                break;
+            }
+        }
+    }
+
     uint32_t siteId_;
     LamportClock clock_;
     Sequence sequence_;
     std::vector<InsertionOp> pendingOperations_;
+    std::vector<DeletionOp> pendingDeletions_;
 };
 
 } // namespace collabpad

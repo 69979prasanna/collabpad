@@ -37,10 +37,11 @@ export class CharId {
 }
 
 export class Character {
-  constructor(id, afterId, value) {
+  constructor(id, afterId, value, isDeleted = false) {
     this.id = id;
     this.afterId = afterId || CharId.root();
     this.value = value;
+    this.isDeleted = Boolean(isDeleted);
   }
 }
 
@@ -52,6 +53,26 @@ export class Sequence {
   contains(id) {
     if (id.isRoot()) return true;
     return this.elements.some(ch => ch.id.equals(id));
+  }
+
+  markDeleted(id) {
+    if (id.isRoot()) return false;
+    for (const ch of this.elements) {
+      if (ch.id.equals(id)) {
+        if (ch.isDeleted) return false;
+        ch.isDeleted = true;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  isTombstone(id) {
+    if (id.isRoot()) return false;
+    for (const ch of this.elements) {
+      if (ch.id.equals(id)) return ch.isDeleted;
+    }
+    return false;
   }
 
   getParentId(id) {
@@ -83,7 +104,6 @@ export class Sequence {
       for (let i = 0; i < this.elements.length; ++i) {
         if (this.elements[i].id.equals(afterId)) {
           parentIdx = i + 1;
-          found = true;
           break;
         }
       }
@@ -105,30 +125,49 @@ export class Sequence {
     return i;
   }
 
-  insertAfter(id, afterId, value) {
+  insertAfter(id, afterId, value, isDeleted = false) {
     if (this.contains(id)) return false;
     const index = this.findInsertIndex(id, afterId);
-    this.elements.splice(index, 0, new Character(id, afterId, value));
+    this.elements.splice(index, 0, new Character(id, afterId, value, isDeleted));
     return true;
   }
 
   getText() {
-    return this.elements.map(c => c.value).join('');
+    return this.elements.filter(c => !c.isDeleted).map(c => c.value).join('');
   }
 
   size() {
     return this.elements.length;
   }
 
-  getIdAt(index) {
-    if (index >= 0 && index < this.elements.length) {
-      return this.elements[index].id;
+  visibleSize() {
+    return this.elements.filter(c => !c.isDeleted).length;
+  }
+
+  getIdAt(visualIndex) {
+    let current = 0;
+    for (const ch of this.elements) {
+      if (!ch.isDeleted) {
+        if (current === visualIndex) {
+          return ch.id;
+        }
+        current++;
+      }
     }
     return CharId.root();
   }
 
   findIndex(id) {
-    return this.elements.findIndex(c => c.id.equals(id));
+    let visualIdx = 0;
+    for (const ch of this.elements) {
+      if (ch.id.equals(id)) {
+        return ch.isDeleted ? -1 : visualIdx;
+      }
+      if (!ch.isDeleted) {
+        visualIdx++;
+      }
+    }
+    return -1;
   }
 }
 
@@ -138,6 +177,7 @@ export class EngineBridge {
     this.clock = 0;
     this.sequence = new Sequence();
     this.pendingOps = [];
+    this.pendingDeletions = [];
     this.wasmInstance = null;
     this.isWasmActive = false;
 
@@ -195,7 +235,77 @@ export class EngineBridge {
     return this.localInsertAfter(CharId.root(), value);
   }
 
+  localDelete(targetId) {
+    if (!targetId || targetId.isRoot()) return null;
+    const timestamp = this.tick();
+
+    if (this.isWasmActive && this.wasmInstance) {
+      try {
+        const op = this.wasmInstance.localDelete(targetId);
+        return {
+          type: 'delete',
+          siteId: op.siteId,
+          clock: op.clock,
+          targetId: { siteId: op.targetId.siteId, clock: op.targetId.clock },
+        };
+      } catch (e) {
+        console.error('[EngineBridge] WASM localDelete error:', e);
+      }
+    }
+
+    this.sequence.markDeleted(targetId);
+    return {
+      type: 'delete',
+      siteId: this.siteId,
+      clock: timestamp,
+      targetId: { siteId: targetId.siteId, clock: targetId.clock },
+    };
+  }
+
+  localDeleteAt(visualIndex) {
+    const targetId = this.getIdAt(visualIndex);
+    if (!targetId || targetId.isRoot()) return null;
+    return this.localDelete(targetId);
+  }
+
+  applyDelete(delOp) {
+    if (!delOp || !delOp.targetId) return false;
+    const targetId = new CharId(delOp.targetId.siteId, delOp.targetId.clock);
+    if (targetId.isRoot()) return false;
+
+    if (typeof delOp.clock === 'number') {
+      this.updateClock(delOp.clock);
+    }
+
+    if (this.isWasmActive && this.wasmInstance) {
+      try {
+        return this.wasmInstance.applyDelete(delOp);
+      } catch (e) {
+        console.error('[EngineBridge] WASM applyDelete error:', e);
+      }
+    }
+
+    if (this.sequence.contains(targetId)) {
+      return this.sequence.markDeleted(targetId);
+    }
+
+    // Buffer out-of-order delete
+    if (!this.pendingDeletions.some(p => p.targetId.equals(targetId))) {
+      this.pendingDeletions.push({
+        targetId,
+        siteId: delOp.siteId || 0,
+        clock: delOp.clock || 0,
+      });
+    }
+    return false;
+  }
+
   applyOperation(rawOp) {
+    if (!rawOp) return false;
+    if (rawOp.type === 'delete' || rawOp.targetId) {
+      return this.applyDelete(rawOp);
+    }
+
     const op = {
       id: new CharId(rawOp.id.siteId, rawOp.id.clock),
       afterId: new CharId(rawOp.afterId ? rawOp.afterId.siteId : 0, rawOp.afterId ? rawOp.afterId.clock : 0),
@@ -224,10 +334,19 @@ export class EngineBridge {
 
     // Insert
     this.sequence.insertAfter(op.id, op.afterId, op.value);
+    this.checkPendingDeletion(op.id);
 
     // Resolve unblocked pending
     this.tryApplyPending();
     return true;
+  }
+
+  checkPendingDeletion(id) {
+    const idx = this.pendingDeletions.findIndex(p => p.targetId.equals(id));
+    if (idx !== -1) {
+      this.sequence.markDeleted(id);
+      this.pendingDeletions.splice(idx, 1);
+    }
   }
 
   tryApplyPending() {
@@ -239,6 +358,7 @@ export class EngineBridge {
         if (op.afterId.isRoot() || this.sequence.contains(op.afterId)) {
           this.pendingOps.splice(i, 1);
           this.sequence.insertAfter(op.id, op.afterId, op.value);
+          this.checkPendingDeletion(op.id);
           progress = true;
         } else {
           ++i;
@@ -285,6 +405,15 @@ export class EngineBridge {
     return this.sequence.size();
   }
 
+  visibleSize() {
+    if (this.isWasmActive && this.wasmInstance) {
+      try {
+        return this.wasmInstance.visibleSize();
+      } catch (e) {}
+    }
+    return this.sequence.visibleSize();
+  }
+
   loadSnapshot(snapshot) {
     if (!snapshot) return;
     if (typeof snapshot.clock === 'number') {
@@ -294,10 +423,23 @@ export class EngineBridge {
       this.sequence.elements = snapshot.characters.map(ch => new Character(
         new CharId(ch.id.siteId, ch.id.clock),
         new CharId(ch.afterId ? ch.afterId.siteId : 0, ch.afterId ? ch.afterId.clock : 0),
-        ch.value
+        ch.value,
+        Boolean(ch.deleted || ch.isDeleted)
       ));
     }
     this.pendingOps = [];
+    if (Array.isArray(snapshot.pendingDeletions)) {
+      this.pendingDeletions = snapshot.pendingDeletions.map(del => ({
+        targetId: new CharId(
+          del.targetId ? del.targetId.siteId : del.siteId,
+          del.targetId ? del.targetId.clock : del.clock
+        ),
+        siteId: del.siteId || 0,
+        clock: del.clock || 0,
+      }));
+    } else {
+      this.pendingDeletions = [];
+    }
   }
 
   mergeSnapshot(snapshot) {

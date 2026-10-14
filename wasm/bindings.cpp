@@ -36,17 +36,29 @@ EMSCRIPTEN_BINDINGS(collabpad_module) {
         .field("afterId", &collabpad::InsertionOp::afterId)
         .field("value",   &collabpad::InsertionOp::value);
 
+    // DeletionOp
+    value_object<collabpad::DeletionOp>("DeletionOp")
+        .field("targetId", &collabpad::DeletionOp::targetId)
+        .field("siteId",   &collabpad::DeletionOp::siteId)
+        .field("clock",    &collabpad::DeletionOp::clock);
+
     // Replica
     class_<collabpad::Replica>("Replica")
         .constructor<uint32_t>()
         .function("localInsertAfter", &collabpad::Replica::localInsertAfter)
         .function("localInsertAtBeginning", &collabpad::Replica::localInsertAtBeginning)
         .function("applyOperation", &collabpad::Replica::applyOperation)
+        .function("localDelete", &collabpad::Replica::localDelete)
+        .function("localDeleteAt", &collabpad::Replica::localDeleteAt)
+        .function("applyDelete", &collabpad::Replica::applyDelete)
         .function("getText", &collabpad::Replica::getText)
         .function("getSiteId", &collabpad::Replica::getSiteId)
         .function("hasPendingOperations", &collabpad::Replica::hasPendingOperations)
         .function("getPendingCount", &collabpad::Replica::getPendingCount)
+        .function("hasPendingDeletions", &collabpad::Replica::hasPendingDeletions)
+        .function("getPendingDeletionCount", &collabpad::Replica::getPendingDeletionCount)
         .function("getIdAt", &replicaGetIdAt)
         .function("findIndex", &replicaFindIndex)
-        .function("size", &replicaGetSize);
+        .function("size", &replicaGetSize)
+        .function("visibleSize", &collabpad::Replica::visibleSize);
 }

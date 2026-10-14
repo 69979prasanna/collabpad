@@ -19,6 +19,10 @@ target_link_libraries(collabpad_demo PRIVATE collabpad_core)
 add_executable(collabpad_phase2_demo core/tests/phase2_demo.cpp)
 target_link_libraries(collabpad_phase2_demo PRIVATE collabpad_core)
 
+# Phase 6 terminal demo (RGA Deletion & Tombstone Tracking)
+add_executable(collabpad_phase6_demo core/tests/phase6_demo.cpp)
+target_link_libraries(collabpad_phase6_demo PRIVATE collabpad_core)
+
 # -------------------------------------------------------------------------
 # Phase 3: WebSocket server
 #

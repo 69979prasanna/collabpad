@@ -166,6 +166,40 @@ int main() {
     assert(repServerRestart.getPendingDeletionCount() == 1);
     cout << "  [PASS] Case 5: Tombstones and pending deletions survive snapshot serialization.\n";
 
+    // -------------------------------------------------------------------------
+    // Test Case 6: Backward Compatibility with Legacy Snapshots
+    // -------------------------------------------------------------------------
+    cout << "\n[Case 6] Backward Compatibility with Legacy Snapshots (No Deletion Fields)...\n";
+    string legacyJson = "{\"docId\":\"legacy-doc\",\"title\":\"Legacy Title\",\"clock\":3,"
+                        "\"characters\":["
+                        "{\"id\":{\"siteId\":1,\"clock\":1},\"afterId\":{\"siteId\":0,\"clock\":0},\"value\":\"L\"},"
+                        "{\"id\":{\"siteId\":1,\"clock\":2},\"afterId\":{\"siteId\":1,\"clock\":1},\"value\":\"E\"},"
+                        "{\"id\":{\"siteId\":1,\"clock\":3},\"afterId\":{\"siteId\":1,\"clock\":2},\"value\":\"G\"}"
+                        "]}";
+    DocumentSnapshot legacySnap;
+    bool legacyOk = DocumentSnapshot::fromJson(legacyJson, legacySnap);
+    assert(legacyOk);
+    assert(legacySnap.characters.size() == 3);
+    assert(!legacySnap.characters[0].isDeleted);
+    assert(!legacySnap.characters[1].isDeleted);
+    assert(!legacySnap.characters[2].isDeleted);
+
+    Replica legacyReplica(2);
+    legacyReplica.loadSnapshot(legacySnap);
+    assert(legacyReplica.getText() == "LEG");
+    assert(legacyReplica.visibleSize() == 3);
+    assert(legacyReplica.getSequence().size() == 3);
+    assert(!legacyReplica.hasPendingDeletions());
+    assert(legacyReplica.getPendingDeletionCount() == 0);
+
+    // Deletion on restored legacy replica should work seamlessly
+    auto delE = legacyReplica.localDeleteAt(1);
+    assert(legacyReplica.getText() == "LG");
+    assert(legacyReplica.visibleSize() == 2);
+    assert(legacyReplica.getSequence().size() == 3);
+    assert(legacyReplica.getSequence().isTombstone(delE.targetId));
+    cout << "  [PASS] Case 6: Legacy snapshots without deletion metadata load with characters visible.\n";
+
     printHeader("ALL PHASE 6 C++ VERIFICATION CASES PASSED (0 ERRORS)");
     return 0;
 }

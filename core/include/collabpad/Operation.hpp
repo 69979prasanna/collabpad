@@ -33,7 +33,38 @@ struct InsertionOp {
     }
 };
 
+/**
+ * @brief Represents a deletion operation in an RGA-based collaborative sequence.
+ * 
+ * Each operation contains:
+ * - targetId: The CharId of the character node being tombstoned.
+ * - siteId: The site ID of the replica that generated the deletion.
+ * - clock: Lamport timestamp of the deletion event.
+ */
+struct DeletionOp {
+    CharId targetId;
+    uint32_t siteId{0};
+    uint64_t clock{0};
+
+    DeletionOp() = default;
+
+    explicit DeletionOp(CharId target)
+        : targetId(target), siteId(0), clock(0) {}
+
+    DeletionOp(CharId target, uint32_t site, uint64_t clk)
+        : targetId(target), siteId(site), clock(clk) {}
+
+    bool operator==(const DeletionOp& other) const {
+        return targetId == other.targetId && siteId == other.siteId && clock == other.clock;
+    }
+
+    bool operator!=(const DeletionOp& other) const {
+        return !(*this == other);
+    }
+};
+
 // Convenient alias for general operation usage
 using Operation = InsertionOp;
 
 } // namespace collabpad
+

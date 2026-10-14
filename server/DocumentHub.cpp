@@ -169,6 +169,41 @@ void DocumentHub::applyOpJson(DocumentRoom& room, const string& json) {
     size_t opPos = json.find("\"op\"");
     if (opPos == string::npos) return;
 
+    size_t targetPos = json.find("\"targetId\"", opPos);
+    bool isDelete = (targetPos != string::npos) ||
+                    (json.find("\"delete\"", opPos) != string::npos);
+
+    if (isDelete && targetPos != string::npos) {
+        uint32_t targetSite = static_cast<uint32_t>(parseSubInt(json, targetPos, "siteId"));
+        uint64_t targetClock = parseSubInt(json, targetPos, "clock");
+        uint32_t opSite = static_cast<uint32_t>(parseSubInt(json, opPos, "siteId"));
+        uint64_t opClock = parseSubInt(json, opPos, "clock");
+
+        if (opSite == 0) {
+            opSite = static_cast<uint32_t>(parseSubInt(json, 0, "siteId"));
+        }
+        if (opClock == 0) {
+            opClock = targetClock;
+        }
+
+        if (targetClock > 0) {
+            DeletionOp delOp(CharId(targetSite, targetClock), opSite, opClock);
+            room.replica->applyDelete(delOp);
+            room.isDirty = true;
+
+            // Persist update immediately to repository for durable recovery
+            if (repository_) {
+                DocumentSnapshot snap = room.replica->createSnapshot(room.docId, room.title);
+                if (!repository_->save(snap)) {
+                    cerr << "[Hub] WARNING: Failed to persist delete to document \""
+                         << room.docId << "\"\n";
+                }
+                room.isDirty = false;
+            }
+        }
+        return;
+    }
+
     size_t idPos = json.find("\"id\"", opPos);
     size_t afterPos = json.find("\"afterId\"", opPos);
     if (idPos == string::npos || afterPos == string::npos) return;

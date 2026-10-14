@@ -117,6 +117,25 @@ export default function App() {
       suffix++;
     }
 
+    // Process deletions first
+    const deletedCount = oldText.length - prefix - suffix;
+    if (deletedCount > 0) {
+      for (let i = prefix + deletedCount - 1; i >= prefix; i--) {
+        const targetId = engineRef.current.getIdAt(i);
+        if (targetId && !targetId.isRoot()) {
+          const delOp = engineRef.current.localDelete(targetId);
+          if (delOp) {
+            sendOperation({
+              type: 'delete',
+              siteId: delOp.siteId,
+              clock: delOp.clock,
+              targetId: { siteId: delOp.targetId.siteId, clock: delOp.targetId.clock },
+            });
+          }
+        }
+      }
+    }
+
     const insertedText = newText.substring(prefix, newText.length - suffix);
 
     // Apply insertions
