@@ -7,6 +7,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <cstdint>
 #include <collabpad/Replica.hpp>
 #include <collabpad/DocumentSnapshot.hpp>
 #include "DocumentRepository.hpp"
@@ -30,10 +31,15 @@ struct DocumentRoom {
     std::vector<std::shared_ptr<Session>> sessions;
     std::unordered_map<uint32_t, CollaboratorInfo> collaborators; // sessionId -> info
     bool isDirty{false};
+    uint64_t firstDirtyTimeMs{0};
+    uint64_t lastEditTimeMs{0};
 };
 
 class DocumentHub {
 public:
+    static constexpr uint64_t DEFAULT_DEBOUNCE_DELAY_MS = 1000;    // 1.0s idle
+    static constexpr uint64_t DEFAULT_MAX_FLUSH_INTERVAL_MS = 3000; // 3.0s max
+
     explicit DocumentHub(std::shared_ptr<DocumentRepository> repository = nullptr);
 
     // Non-copyable
@@ -77,6 +83,15 @@ public:
 
     // Save all dirty documents (e.g. during server shutdown)
     void flushAll();
+
+    // Evaluates dirty rooms against timing thresholds and persists eligible rooms.
+    // Returns number of rooms flushed.
+    size_t flushDirty(uint64_t nowMs,
+                      uint64_t debounceDelayMs = DEFAULT_DEBOUNCE_DELAY_MS,
+                      uint64_t maxFlushIntervalMs = DEFAULT_MAX_FLUSH_INTERVAL_MS);
+
+    // Check if a specific room is dirty
+    bool isRoomDirty(const std::string& docId) const;
 
     // Remove dead sessions from all document lists (housekeeping).
     void prune();

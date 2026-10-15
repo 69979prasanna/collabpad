@@ -2,9 +2,10 @@
 
 ## Current Position
 - **Active Milestone**: `Milestone 2` (Production Hardening & Advanced CRDT).
-- **Current Phase**: `Phase 6` (RGA Deletion & Tombstone Tracking) — **COMPLETED**.
-- **Phase 6 Plan**: [PLAN.md](phases/06-rga-deletion-tombstones/PLAN.md)
-- **Phase 6 Research**: [RESEARCH.md](phases/06-rga-deletion-tombstones/RESEARCH.md)
+- **Current Phase**: `Phase 7` (Asynchronous & Debounced Disk Persistence) — **READY FOR EXECUTION**.
+- **Phase 7 Plan**: [PLAN.md](phases/07-asynchronous-debounced-persistence/PLAN.md)
+- **Phase 7 Research**: [RESEARCH.md](phases/07-asynchronous-debounced-persistence/RESEARCH.md)
+- **Previous Phase**: `Phase 6` (RGA Deletion & Tombstone Tracking) — **COMPLETED & VERIFIED**.
 - **Codebase Mapping**: Completed & committed (`0d229df` in [codebase/](codebase/)).
 
 ---
