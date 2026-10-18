@@ -1,6 +1,5 @@
-// client/src/components/Toolbar.jsx
 import React from 'react';
-import { Share2, Users, FileCode2, Copy, Check } from 'lucide-react';
+import { Share2, Users, FileCode2, Copy, Check, Sun, Moon } from 'lucide-react';
 
 export function Toolbar({
   docTitle,
@@ -9,6 +8,8 @@ export function Toolbar({
   connectionStatus,
   collaboratorsCount,
   onOpenShare,
+  theme = 'dark',
+  onToggleTheme,
 }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -52,6 +53,16 @@ export function Toolbar({
       </div>
 
       <div className="toolbar-right">
+        {/* Dark/Light mode toggle button immediately to the left of Connected status */}
+        <button
+          className="theme-toggle-btn"
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+        </button>
+
         {/* Connection status pill */}
         <div className={`connection-status status-${connectionStatus}`}>
           <span className="status-dot"></span>

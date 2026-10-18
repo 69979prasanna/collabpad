@@ -3,12 +3,19 @@
 ## Project goal
 Improve the existing CollabPad collaborative editor incrementally. Preserve working functionality and follow the approved GSD plan.
 
+## Mandatory Reading Order
+Before undertaking any implementation or modification, agents MUST read documents in this exact order:
+1. `RULES.md` — Mandatory coding rules, task boundary constraints, and evidence standards.
+2. `PRD.md` and relevant sections of `DESIGN.md` — Product requirements, system architecture, component boundaries, and wire contracts.
+3. `MEMORY.md` — Confirmed decisions (ADRs), resolved bugs, and repository constraints.
+4. `TRACKER.md` and `.planning/STATE.md` — Current verified status, active milestone, and authorized next task.
+5. The active approved phase plan (e.g. `.planning/phases/07-asynchronous-debounced-persistence/PLAN.md` and `RESEARCH.md`).
+
 ## Before making changes
-- Read `.planning/STATE.md` if present.
-- Read the relevant `.planning/phases/06-rga-deletion-tombstones/PLAN.md` and `RESEARCH.md`.
-- Inspect the actual source code before assuming a feature is missing.
-- Check the current Git branch and working-tree status.
-- Identify the smallest set of files needed for the task.
+- Inspect the actual source code and existing tests before assuming a feature or function is missing.
+- Check the current Git branch (`git status`) and confirm working tree state.
+- Identify the smallest possible set of files needed for the single approved task.
+- Ensure the task is explicitly authorized in `TRACKER.md`.
 
 ## Architecture and compatibility
 - Preserve the existing C++ RGA/CRDT engine and operation ordering.

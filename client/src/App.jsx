@@ -9,6 +9,39 @@ import { WasmStatusBanner } from './components/WasmStatusBanner';
 import { useCollabSocket } from './hooks/useCollabSocket';
 import { EngineBridge, CharId } from './engine/engineBridge';
 
+// Default documents loaded on first visit
+const DEFAULT_DOCUMENTS = [
+  { id: 'demo', title: 'Live Collab Demo' },
+  { id: 'main-cpp', title: 'main.cpp' },
+  { id: 'architecture-notes', title: 'Architecture Specs' },
+];
+
+function loadSavedDocuments() {
+  try {
+    const stored = localStorage.getItem('collabpad_documents');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const valid = parsed.filter(d => d && typeof d.id === 'string' && d.id.trim() && typeof d.title === 'string');
+        if (valid.length > 0) return valid;
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage] Could not load documents from localStorage:', err);
+  }
+  return DEFAULT_DOCUMENTS;
+}
+
+function saveDocuments(docs) {
+  try {
+    localStorage.setItem('collabpad_documents', JSON.stringify(docs));
+    return true;
+  } catch (err) {
+    console.error('[Storage] Could not save documents to localStorage:', err);
+    return false;
+  }
+}
+
 // Generate or retrieve siteId unique to this browser tab session
 function getOrCreateSiteId() {
   const stored = sessionStorage.getItem('collabpad_site_id');
@@ -19,25 +52,63 @@ function getOrCreateSiteId() {
 }
 
 function getInitialRoom() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const room = urlParams.get('room');
-  return room ? room.trim() : 'demo';
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const room = urlParams.get('room');
+    if (room && room.trim()) return room.trim();
+  } catch (e) {}
+  return 'demo';
+}
+
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem('collabpad_theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch (e) {
+    console.warn('[Storage] Could not read theme from localStorage:', e);
+  }
+  return 'dark'; // Dark is default
 }
 
 export default function App() {
   const [siteId] = useState(getOrCreateSiteId);
   const [userName] = useState(`Engineer-${siteId}`);
   const [activeDocId, setActiveDocId] = useState(getInitialRoom);
+  const [theme, setTheme] = useState(getInitialTheme);
+  const [persistenceError, setPersistenceError] = useState(null);
 
-  const [documents, setDocuments] = useState([
-    { id: 'demo', title: 'Live Collab Demo' },
-    { id: 'main-cpp', title: 'main.cpp' },
-    { id: 'architecture-notes', title: 'Architecture Specs' },
-  ]);
+  const [documents, setDocuments] = useState(loadSavedDocuments);
 
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [text, setText] = useState('');
   const [pendingCount, setPendingCount] = useState(0);
+
+  // Apply theme to document element and persist choice
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('collabpad_theme', theme);
+    } catch (e) {
+      console.warn('[Storage] Could not save theme preference:', e);
+    }
+  }, [theme]);
+
+  const handleToggleTheme = useCallback(() => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  // Ensure active room is tracked in documents list
+  useEffect(() => {
+    setDocuments(prev => {
+      const exists = prev.some(d => d.id === activeDocId);
+      if (!exists) {
+        const updated = [...prev, { id: activeDocId, title: `Room #${activeDocId}` }];
+        saveDocuments(updated);
+        return updated;
+      }
+      return prev;
+    });
+  }, [activeDocId]);
 
   // Reference to current CRDT engine
   const engineRef = useRef(null);
@@ -73,7 +144,20 @@ export default function App() {
     setText(newText);
     setPendingCount(engineRef.current.pendingOps ? engineRef.current.pendingOps.length : 0);
     isRemoteUpdatingRef.current = false;
-  }, []);
+
+    // Synchronize snapshot title if authoritatively provided by server
+    if (snapshot.title && snapshot.title.trim() && snapshot.title !== activeDocId) {
+      setDocuments(prev => {
+        const currentDoc = prev.find(d => d.id === activeDocId);
+        if (currentDoc && (currentDoc.title === activeDocId || !currentDoc.title.trim())) {
+          const updated = prev.map(d => d.id === activeDocId ? { ...d, title: snapshot.title } : d);
+          saveDocuments(updated);
+          return updated;
+        }
+        return prev;
+      });
+    }
+  }, [activeDocId]);
 
   // WebSocket hook
   const {
@@ -158,27 +242,83 @@ export default function App() {
   // Active doc title
   const activeDoc = documents.find((d) => d.id === activeDocId) || { id: activeDocId, title: activeDocId };
 
-  const handleUpdateTitle = (newTitle) => {
-    setDocuments((prev) =>
-      prev.map((d) => (d.id === activeDocId ? { ...d, title: newTitle } : d))
-    );
-  };
-
-  const handleCreateDoc = () => {
-    const newId = `doc-${Math.floor(Math.random() * 9000) + 1000}`;
-    const newDoc = { id: newId, title: `New Document ${newId}` };
-    setDocuments((prev) => [...prev, newDoc]);
-    setActiveDocId(newId);
-  };
-
-  const handleJoinRoom = (roomId) => {
-    if (!roomId) return;
-    const exists = documents.some((d) => d.id === roomId);
-    if (!exists) {
-      setDocuments((prev) => [...prev, { id: roomId, title: `Room #${roomId}` }]);
+  const handleUpdateTitle = useCallback((newTitle) => {
+    // Prevent empty or whitespace-only names according to naming conventions
+    const trimmed = (newTitle || '').trim();
+    if (!trimmed) {
+      // Retain previous title or activeDocId if cleared
+      return;
     }
-    setActiveDocId(roomId);
-  };
+
+    const previousDocs = documents;
+    const nextDocs = documents.map((d) =>
+      d.id === activeDocId ? { ...d, title: newTitle } : d
+    );
+
+    const ok = saveDocuments(nextDocs);
+    if (!ok) {
+      setPersistenceError('Failed to persist document rename to storage.');
+      setDocuments(previousDocs); // Rollback on failure
+      return;
+    }
+    setPersistenceError(null);
+    setDocuments(nextDocs);
+  }, [documents, activeDocId]);
+
+  const handleSelectDoc = useCallback((docId) => {
+    setActiveDocId(docId);
+    try {
+      const url = new URL(window.location);
+      url.searchParams.set('room', docId);
+      window.history.pushState({}, '', url);
+    } catch (e) {}
+  }, []);
+
+  const handleCreateDoc = useCallback(() => {
+    // Generate stable unique document ID
+    const newId = `doc-${Math.floor(Math.random() * 9000) + 1000}`;
+    const newTitle = `New Document ${newId}`;
+    const newDoc = { id: newId, title: newTitle };
+    const nextDocs = [...documents, newDoc];
+
+    const ok = saveDocuments(nextDocs);
+    if (!ok) {
+      setPersistenceError('Failed to persist newly created document to storage.');
+      return;
+    }
+    setPersistenceError(null);
+    setDocuments(nextDocs);
+    setActiveDocId(newId);
+
+    // Update URL query parameter without reload
+    try {
+      const url = new URL(window.location);
+      url.searchParams.set('room', newId);
+      window.history.pushState({}, '', url);
+    } catch (e) {}
+  }, [documents]);
+
+  const handleJoinRoom = useCallback((roomId) => {
+    const cleanId = (roomId || '').trim();
+    if (!cleanId) return;
+
+    setDocuments((prev) => {
+      const exists = prev.some((d) => d.id === cleanId);
+      if (!exists) {
+        const next = [...prev, { id: cleanId, title: `Room #${cleanId}` }];
+        saveDocuments(next);
+        return next;
+      }
+      return prev;
+    });
+
+    setActiveDocId(cleanId);
+    try {
+      const url = new URL(window.location);
+      url.searchParams.set('room', cleanId);
+      window.history.pushState({}, '', url);
+    } catch (e) {}
+  }, []);
 
   return (
     <div className="app-container">
@@ -190,14 +330,30 @@ export default function App() {
         connectionStatus={connectionStatus}
         collaboratorsCount={collaborators.length + 1}
         onOpenShare={() => setIsShareOpen(true)}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
+
+      {/* Persistence Error Notification Banner */}
+      {persistenceError && (
+        <div className="persistence-error-banner" role="alert">
+          <span>{persistenceError}</span>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setPersistenceError(null)}
+            style={{ color: 'inherit', padding: '2px 8px' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="app-body">
         {/* Left Sidebar: Workspaces & Documents */}
         <Sidebar
           documents={documents}
           activeDocId={activeDocId}
-          onSelectDoc={setActiveDocId}
+          onSelectDoc={handleSelectDoc}
           onCreateDoc={handleCreateDoc}
           onJoinRoom={handleJoinRoom}
         />
@@ -207,7 +363,7 @@ export default function App() {
           <WasmStatusBanner
             isWasmActive={engineRef.current ? engineRef.current.isWasmActive : false}
             pendingCount={engineRef.current ? engineRef.current.pendingOps.length : 0}
-            charCount={text.length}
+            charCount={text ? text.length : 0}
           />
 
           <Editor

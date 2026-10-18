@@ -1,30 +1,44 @@
 # CollabPad Ralph Loop Prompt
 
-Read and follow the repository-root AGENTS.md before making changes.
+## Mandatory Reading Order
+Before performing any work, read the project control documents in this exact sequence:
+1. `RULES.md` — Non-negotiable coding rules and task boundary constraints.
+2. `PRD.md` and relevant sections of `DESIGN.md` — Product and architectural contracts.
+3. `MEMORY.md` — Architectural decisions (ADRs) and repository gotchas.
+4. `TRACKER.md` and `.planning/STATE.md` — Active status and authorized task boundary.
+5. Active Phase Plan: `.planning/phases/07-asynchronous-debounced-persistence/PLAN.md` and `RESEARCH.md`.
 
-Follow the approved GSD Phase 6 plan:
-- .planning/phases/06-rga-deletion-tombstones/PLAN.md
-- .planning/phases/06-rga-deletion-tombstones/RESEARCH.md
+---
 
-## Current objective
-Implement only Phase 6 Wave 1 Task 1.2: C++ deletion operations and replica handling, provided Task 1.1 is already complete.
+## Current Objective: Phase 7 — Wave 1 Task 1.2
+**Task**: Decouple Per-Operation Persistence in `applyOpJson` (`server/DocumentHub.cpp`).  
+Confirm that Task 1.1 declarations (`firstDirtyTimeMs`, `lastEditTimeMs`, `flushDirty`, `isRoomDirty`) exist in `server/DocumentHub.hpp`.
 
-## Required process
-1. Inspect Git status and the current branch.
-2. Inspect existing Character, Sequence, Operation, Replica, and C++ tests.
-3. Verify whether deletion state and markDeleted already exist.
-4. Implement only the approved task.
-5. Add focused tests for local deletion, duplicate deletion, and out-of-order delivery.
-6. Run relevant existing tests and builds.
-7. Review the full diff and report actual results.
+### Required Scope:
+1. Inspect `server/DocumentHub.hpp` to verify Task 1.1 timing fields and declarations.
+2. In `server/DocumentHub.cpp`:
+   - In `applyOpJson()` for `isDelete`: remove synchronous `repository_->save(...)`; set `room.isDirty = true`; record monotonic `firstDirtyTimeMs` (if zero) and `lastEditTimeMs`.
+   - In `applyOpJson()` for insertions: remove synchronous `repository_->save(...)`; set `room.isDirty = true`; record monotonic `firstDirtyTimeMs` (if zero) and `lastEditTimeMs`.
+3. Keep changes strictly bounded to `server/DocumentHub.cpp`.
 
-## Strict restrictions
-- Do not rewrite working insertion logic.
-- Do not duplicate existing deletion functionality.
-- Do not modify snapshots, server code, WebSocket protocol, JavaScript, React, or WebAssembly in this task.
-- Do not discard user changes.
-- Do not commit, push, reset, or switch branches automatically.
-- Do not claim success without running the relevant checks.
-- Stop if Task 1.1 is incomplete or the plan requires changes outside this scope.
+---
 
-Finish after this task. Do not automatically proceed to the next phase or task.
+## Required Execution Process
+1. Inspect `git status` and working tree before making any changes.
+2. Verify Task 1.1 declarations are intact.
+3. Make the minimal edits required to decouple synchronous writes from `applyOpJson`.
+4. Compile native targets: `cmake --build build`.
+5. Run regression checks: `python tests/test_deletion.py 8096` and `python tests/test_phase5.py 8095`.
+6. Review the full `git diff`.
+7. Generate a concise completion report specifying changed files, commands executed, actual test outcomes, and next step.
+
+---
+
+## Strict Restrictions
+- **One bounded task only**: Implement only Task 1.2. Do not proceed to Task 1.3 or Wave 2.
+- **Do not invent follow-up tasks** or expand scope beyond `server/DocumentHub.cpp`.
+- **Do not modify working CRDT core** (`core/include/collabpad/`).
+- **Do not alter wire protocol or JSON serialization formats**.
+- **Never discard user changes or uncommitted work**.
+- **Never commit, push, or reset automatically**.
+- Stop and explain if any build fails, tests regress, or out-of-scope edits are needed.
