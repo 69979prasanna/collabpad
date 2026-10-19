@@ -1,6 +1,6 @@
 // client/src/components/ShareModal.jsx
 import React, { useState } from 'react';
-import { X, Copy, Check, ExternalLink } from 'lucide-react';
+import { X, Copy, Check } from 'lucide-react';
 
 export function ShareModal({ docId, onClose }) {
   const [copiedLink, setCopiedLink] = useState(false);
@@ -21,18 +21,30 @@ export function ShareModal({ docId, onClose }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-share-title"
+    >
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Invite Collaborators</h2>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>
+          <h2 id="modal-share-title" className="modal-title">
+            Invite Collaborators
+          </h2>
+          <button
+            className="btn btn-ghost btn-icon-only"
+            onClick={onClose}
+            aria-label="Close modal"
+          >
             <X size={18} />
           </button>
         </div>
 
         <div className="modal-body">
           <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-            Share this room link or Room ID with your team. Anyone in this room can edit code and text together in real-time.
+            Share this room link or Room ID with your team. Anyone joining this room will collaborate in real time with deterministic CRDT convergence.
           </p>
 
           <div className="input-group">
@@ -43,8 +55,13 @@ export function ShareModal({ docId, onClose }) {
                 className="input-field"
                 value={inviteUrl}
                 readOnly
+                aria-label="Invitation Link"
               />
-              <button className="btn btn-primary btn-sm" onClick={handleCopyLink}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleCopyLink}
+                aria-label="Copy invitation link"
+              >
                 {copiedLink ? <Check size={14} /> : <Copy size={14} />}
                 <span>{copiedLink ? 'Copied' : 'Copy'}</span>
               </button>
@@ -59,8 +76,13 @@ export function ShareModal({ docId, onClose }) {
                 className="input-field"
                 value={docId}
                 readOnly
+                aria-label="Room ID"
               />
-              <button className="btn btn-secondary btn-sm" onClick={handleCopyId}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleCopyId}
+                aria-label="Copy Room ID"
+              >
                 {copiedId ? <Check size={14} /> : <Copy size={14} />}
                 <span>{copiedId ? 'Copied' : 'Copy'}</span>
               </button>
@@ -70,14 +92,14 @@ export function ShareModal({ docId, onClose }) {
           <div
             style={{
               padding: '12px',
-              backgroundColor: 'rgba(99, 102, 241, 0.08)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
+              backgroundColor: 'var(--accent-primary-subtle)',
+              border: '1px solid rgba(99, 102, 241, 0.25)',
               borderRadius: 'var(--radius-sm)',
               fontSize: '0.8rem',
               color: 'var(--text-secondary)',
             }}
           >
-            <strong>Pro-tip for testing:</strong> Open this link in a separate browser tab or an Incognito window to simulate two simultaneous collaborators typing and watching each other's edits converge!
+            <strong style={{ color: 'var(--accent-primary)' }}>Multi-user testing:</strong> Open this link in an Incognito tab or second browser window to see two simultaneous collaborators typing and watching each other's edits converge!
           </div>
         </div>
 

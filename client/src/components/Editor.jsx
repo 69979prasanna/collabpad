@@ -1,5 +1,5 @@
 // client/src/components/Editor.jsx
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useMemo } from 'react';
 
 export function Editor({
   text,
@@ -52,7 +52,7 @@ export function Editor({
   return (
     <div className="editor-container">
       {/* Line Numbers Gutter */}
-      <div className="editor-gutter" ref={gutterRef}>
+      <div className="editor-gutter" ref={gutterRef} aria-hidden="true">
         {lineNumbers.map((num) => (
           <div key={num}>{num}</div>
         ))}
@@ -72,7 +72,10 @@ export function Editor({
           spellCheck={false}
           autoCapitalize="off"
           autoComplete="off"
+          autoCorrect="off"
+          data-gramm="false"
           placeholder="Start typing ordinary text or source code here..."
+          aria-label="Code and text collaborative editor"
         />
 
         {/* Remote Cursors Floating Display */}

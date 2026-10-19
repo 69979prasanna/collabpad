@@ -1,6 +1,6 @@
 // client/src/components/CollaboratorsPanel.jsx
 import React from 'react';
-import { Users, Activity, CircleDot } from 'lucide-react';
+import { Users, Activity, CircleDot, X } from 'lucide-react';
 
 export function CollaboratorsPanel({
   collaborators,
@@ -8,16 +8,39 @@ export function CollaboratorsPanel({
   currentUserName,
   currentUserColor,
   activityFeed,
+  isOpen = true,
+  onClose,
 }) {
   return (
-    <aside className="right-sidebar">
+    <aside
+      className={`right-sidebar ${!isOpen ? 'collapsed' : ''}`}
+      aria-label="Active collaborators and recent operations"
+    >
+      {/* Drawer Header (Visible on tablet & mobile) */}
+      <div className="drawer-header">
+        <h3>
+          <Users size={16} color="var(--accent-cyan)" />
+          <span>Collaboration & Activity</span>
+        </h3>
+        {onClose && (
+          <button
+            className="btn btn-ghost btn-icon-only"
+            onClick={onClose}
+            title="Close panel"
+            aria-label="Close panel"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
       {/* Active Collaborators Section */}
       <div className="sidebar-section-header">
-        <div style={{ display: 'flex', alignContent: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Users size={14} />
           <span>Active Collaborators</span>
         </div>
-        <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>
+        <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
           {collaborators.length + 1}
         </span>
       </div>
@@ -27,7 +50,7 @@ export function CollaboratorsPanel({
         <li className="collaborator-card">
           <div
             className="collab-avatar"
-            style={{ backgroundColor: currentUserColor }}
+            style={{ backgroundColor: currentUserColor || '#6366f1' }}
           >
             {currentUserName ? currentUserName[0].toUpperCase() : 'Y'}
           </div>
@@ -37,10 +60,11 @@ export function CollaboratorsPanel({
               <span
                 style={{
                   fontSize: '0.65rem',
-                  backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                  color: '#818cf8',
+                  backgroundColor: 'var(--accent-primary-subtle)',
+                  color: 'var(--accent-primary)',
                   padding: '1px 5px',
                   borderRadius: 3,
+                  fontWeight: 600,
                 }}
               >
                 You
@@ -77,6 +101,7 @@ export function CollaboratorsPanel({
                       padding: '1px 5px',
                       borderRadius: 3,
                       marginLeft: 4,
+                      fontWeight: 500,
                     }}
                   >
                     {statusText}
@@ -95,7 +120,7 @@ export function CollaboratorsPanel({
         className="sidebar-section-header"
         style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 8 }}
       >
-        <div style={{ display: 'flex', alignContent: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Activity size={14} />
           <span>Recent Operations</span>
         </div>

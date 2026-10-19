@@ -1,29 +1,36 @@
 // client/src/components/WasmStatusBanner.jsx
 import React from 'react';
-import { Cpu, Layers, HelpCircle } from 'lucide-react';
+import { Cpu, Layers, GitBranch } from 'lucide-react';
 
 export function WasmStatusBanner({ isWasmActive, pendingCount, charCount }) {
   return (
     <div className="engine-banner">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="engine-banner-left">
+        {/* Engine Type Pill */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Cpu size={14} color={isWasmActive ? '#34d399' : '#818cf8'} />
-          <span>Engine:</span>
+          <Cpu size={14} color={isWasmActive ? '#34d399' : 'var(--accent-primary)'} />
+          <span className="engine-banner-label">Engine:</span>
           <span className={`engine-pill ${isWasmActive ? 'wasm' : 'relay'}`}>
-            {isWasmActive ? 'C++ WebAssembly (Active)' : 'Native Protocol Relay (Standalone)'}
+            {isWasmActive ? 'C++ WebAssembly' : 'JS Protocol Relay'}
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
-          <Layers size={13} />
-          <span>Characters: {charCount}</span>
+        {/* Characters & Buffer Metrics */}
+        <div className="engine-stat-badge">
+          <Layers size={13} color="var(--text-muted)" />
+          <span>
+            {charCount} <span className="engine-banner-label">chars</span>
+          </span>
           {pendingCount > 0 && (
-            <span style={{ color: '#fbbf24' }}>| Buffered Pending: {pendingCount}</span>
+            <span className="engine-pending-badge" title="Operations queued during offline buffering">
+              • {pendingCount} queued
+            </span>
           )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+      <div className="engine-banner-right">
+        <GitBranch size={13} color="var(--text-muted)" />
         <span>RGA Concurrency Model</span>
       </div>
     </div>
