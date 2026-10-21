@@ -6,12 +6,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const COLLAB_COLORS = [
-  '#6366f1', // Indigo
-  '#06b6d4', // Cyan
-  '#10b981', // Emerald
-  '#f59e0b', // Amber
+  '#6366f1', // Primary accent (Indigo)
+  '#38bdf8', // Information (Sky)
+  '#10b981', // Success (Emerald)
+  '#f59e0b', // Warning (Amber)
+  '#8b5cf6', // Secondary collaboration accent (Violet)
   '#ec4899', // Pink
-  '#8b5cf6', // Violet
   '#3b82f6', // Blue
   '#14b8a6', // Teal
 ];

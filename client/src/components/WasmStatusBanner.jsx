@@ -8,7 +8,7 @@ export function WasmStatusBanner({ isWasmActive, pendingCount, charCount }) {
       <div className="engine-banner-left">
         {/* Engine Type Pill */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Cpu size={14} color={isWasmActive ? '#34d399' : 'var(--accent-primary)'} />
+          <Cpu size={14} color={isWasmActive ? 'var(--color-success)' : 'var(--accent-primary)'} />
           <span className="engine-banner-label">Engine:</span>
           <span className={`engine-pill ${isWasmActive ? 'wasm' : 'relay'}`}>
             {isWasmActive ? 'C++ WebAssembly' : 'JS Protocol Relay'}

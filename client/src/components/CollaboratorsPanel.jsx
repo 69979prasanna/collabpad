@@ -19,7 +19,7 @@ export function CollaboratorsPanel({
       {/* Drawer Header (Visible on tablet & mobile) */}
       <div className="drawer-header">
         <h3>
-          <Users size={16} color="var(--accent-cyan)" />
+          <Users size={16} color="var(--color-info)" />
           <span>Collaboration & Activity</span>
         </h3>
         {onClose && (
@@ -40,7 +40,7 @@ export function CollaboratorsPanel({
           <Users size={14} />
           <span>Active Collaborators</span>
         </div>
-        <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
+        <span style={{ fontSize: '0.72rem', color: 'var(--color-info)', fontWeight: 600 }}>
           {collaborators.length + 1}
         </span>
       </div>
@@ -50,7 +50,7 @@ export function CollaboratorsPanel({
         <li className="collaborator-card">
           <div
             className="collab-avatar"
-            style={{ backgroundColor: currentUserColor || '#6366f1' }}
+            style={{ backgroundColor: currentUserColor || 'var(--accent-primary)' }}
           >
             {currentUserName ? currentUserName[0].toUpperCase() : 'Y'}
           </div>
@@ -72,7 +72,7 @@ export function CollaboratorsPanel({
             </div>
             <div className="collab-site">Site ID: #{currentSiteId}</div>
           </div>
-          <CircleDot size={12} color="#10b981" />
+          <CircleDot size={12} color="var(--color-success)" />
         </li>
 
         {/* Remote Collaborators */}
@@ -80,13 +80,22 @@ export function CollaboratorsPanel({
           const isEditing = c.status === 'editing';
           const isIdle = c.status === 'idle';
           const statusText = isEditing ? 'Typing...' : isIdle ? 'Idle' : 'Active';
-          const statusColor = isEditing ? '#06b6d4' : isIdle ? '#f59e0b' : '#10b981';
+          const statusColor = isEditing
+            ? 'var(--color-info)'
+            : isIdle
+            ? 'var(--color-warning)'
+            : 'var(--color-success)';
+          const statusBg = isEditing
+            ? 'var(--color-info-subtle)'
+            : isIdle
+            ? 'var(--color-warning-subtle)'
+            : 'var(--color-success-subtle)';
 
           return (
             <li key={c.siteId} className="collaborator-card">
               <div
                 className="collab-avatar"
-                style={{ backgroundColor: c.color || '#06b6d4' }}
+                style={{ backgroundColor: c.color || 'var(--color-collab-secondary)' }}
               >
                 {c.name ? c.name[0].toUpperCase() : 'U'}
               </div>
@@ -97,7 +106,7 @@ export function CollaboratorsPanel({
                     style={{
                       fontSize: '0.62rem',
                       color: statusColor,
-                      backgroundColor: `${statusColor}22`,
+                      backgroundColor: statusBg,
                       padding: '1px 5px',
                       borderRadius: 3,
                       marginLeft: 4,

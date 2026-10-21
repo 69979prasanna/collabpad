@@ -85,7 +85,7 @@ export function Toolbar({
             aria-label="Copy Room ID"
             style={{ padding: '2px 4px', marginLeft: 2 }}
           >
-            {copied ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+            {copied ? <Check size={12} color="var(--color-success)" /> : <Copy size={12} />}
           </button>
         </div>
       </div>

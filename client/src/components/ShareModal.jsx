@@ -93,7 +93,7 @@ export function ShareModal({ docId, onClose }) {
             style={{
               padding: '12px',
               backgroundColor: 'var(--accent-primary-subtle)',
-              border: '1px solid rgba(99, 102, 241, 0.25)',
+              border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-sm)',
               fontSize: '0.8rem',
               color: 'var(--text-secondary)',
