@@ -1,6 +1,7 @@
 // client/src/components/CollaboratorsPanel.jsx
 import React from 'react';
 import { Users, Activity, CircleDot, X } from 'lucide-react';
+import { tiltHandlers } from '../hooks/tilt';
 
 export function CollaboratorsPanel({
   collaborators,
@@ -47,7 +48,7 @@ export function CollaboratorsPanel({
 
       <ul className="collaborators-list">
         {/* Current User */}
-        <li className="collaborator-card">
+        <li className="collaborator-card tilt" {...tiltHandlers}>
           <div
             className="collab-avatar"
             style={{ backgroundColor: currentUserColor || 'var(--accent-primary)' }}
@@ -92,7 +93,7 @@ export function CollaboratorsPanel({
             : 'var(--color-success-subtle)';
 
           return (
-            <li key={c.siteId} className="collaborator-card">
+            <li key={c.siteId} className="collaborator-card tilt" {...tiltHandlers}>
               <div
                 className="collab-avatar"
                 style={{ backgroundColor: c.color || 'var(--color-collab-secondary)' }}

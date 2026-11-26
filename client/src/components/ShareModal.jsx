@@ -1,4 +1,3 @@
-// client/src/components/ShareModal.jsx
 import React, { useState } from 'react';
 import { X, Copy, Check } from 'lucide-react';
 

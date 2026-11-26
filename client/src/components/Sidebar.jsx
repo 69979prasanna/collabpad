@@ -1,6 +1,7 @@
 // client/src/components/Sidebar.jsx
 import React, { useState } from 'react';
 import { Plus, FolderGit2, FileText, LogIn, X } from 'lucide-react';
+import { tiltHandlers } from '../hooks/tilt';
 
 export function Sidebar({
   documents,
@@ -87,8 +88,9 @@ export function Sidebar({
           return (
             <li
               key={doc.id}
-              className={`sidebar-item ${isActive ? 'active' : ''}`}
+              className={`sidebar-item tilt ${isActive ? 'active' : ''}`}
               onClick={() => handleItemClick(doc.id)}
+              {...tiltHandlers}
               title={`${displayTitle} (#${doc.id})`}
             >
               <div className="sidebar-item-content">

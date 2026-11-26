@@ -13,6 +13,7 @@ import {
   PanelRightClose,
   PanelRight,
 } from 'lucide-react';
+import { Cube3D } from './Background3D';
 
 export function Toolbar({
   docTitle,
@@ -59,9 +60,9 @@ export function Toolbar({
         )}
 
         <div className="app-brand" title="CollabPad — Deterministic CRDT Workspace">
-          <div className="brand-icon">
-            <FileCode2 size={16} />
-          </div>
+          <Cube3D className="brand-icon">
+            <FileCode2 size={15} />
+          </Cube3D>
           <span className="brand-text">CollabPad</span>
         </div>
 

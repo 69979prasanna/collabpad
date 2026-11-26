@@ -6,6 +6,7 @@ import { CollaboratorsPanel } from './components/CollaboratorsPanel';
 import { Editor } from './components/Editor';
 import { ShareModal } from './components/ShareModal';
 import { WasmStatusBanner } from './components/WasmStatusBanner';
+import { Background3D } from './components/Background3D';
 import { useCollabSocket } from './hooks/useCollabSocket';
 import { EngineBridge, CharId } from './engine/engineBridge';
 
@@ -383,6 +384,9 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* Decorative animated 3D backdrop */}
+      <Background3D />
+
       {/* Top Toolbar */}
       <Toolbar
         docTitle={activeDoc.title}

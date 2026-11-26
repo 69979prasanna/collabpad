@@ -1,5 +1,6 @@
 // client/src/components/Editor.jsx
 import React, { useRef, useMemo } from 'react';
+import { Cube3D } from './Background3D';
 
 export function Editor({
   text,
@@ -77,6 +78,17 @@ export function Editor({
           placeholder="Start typing ordinary text or source code here..."
           aria-label="Code and text collaborative editor"
         />
+
+        {/* Empty state (decorative; clicks pass through to the textarea) */}
+        {!text && (
+          <div className="editor-empty" aria-hidden="true">
+            <Cube3D className="editor-empty-cube" />
+            <div className="editor-empty-title">Start writing together</div>
+            <div className="editor-empty-hint">
+              Edits sync live to everyone in this room · Ctrl+B toggles the sidebar
+            </div>
+          </div>
+        )}
 
         {/* Remote Cursors Floating Display */}
         {Object.entries(remoteCursors).map(([siteId, rc]) => {
