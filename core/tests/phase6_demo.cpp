@@ -200,6 +200,41 @@ int main() {
     assert(legacyReplica.getSequence().isTombstone(delE.targetId));
     cout << "  [PASS] Case 6: Legacy snapshots without deletion metadata load with characters visible.\n";
 
+    // -------------------------------------------------------------------------
+    // Test Case 7: Structural JSON Characters as Document Content
+    // Values like '{', '}', '[', ']', '"' and '\\' must not confuse the parser
+    // (regression: brace counting used to include braces inside "value" strings,
+    // dropping characters and injecting zero-valued nodes on restore).
+    // -------------------------------------------------------------------------
+    cout << "\n[Case 7] Snapshot Round-Trip of Brace/Bracket/Quote Characters...\n";
+    const string codeText = "int f() {\n\tif (a[0] == \"}\") { return '\\\\'; }\n}";
+    Replica repCode(5);
+    CharId prevId = CharId::root();
+    for (char ch : codeText) {
+        prevId = repCode.localInsertAfter(prevId, ch).id;
+    }
+    repCode.localDeleteAt(0); // include a tombstone alongside the braces
+    const string expectedText = codeText.substr(1);
+    assert(repCode.getText() == expectedText);
+
+    string codeJson = repCode.createSnapshot("code-room", "Code {Room}").toJson();
+    DocumentSnapshot codeSnap;
+    assert(DocumentSnapshot::fromJson(codeJson, codeSnap));
+    assert(codeSnap.characters.size() == codeText.size());
+    for (const auto& ch : codeSnap.characters) {
+        assert(!(ch.id.siteId == 0 && ch.id.clock == 0)); // no default/junk nodes
+    }
+
+    Replica repCodeRestart(0);
+    repCodeRestart.loadSnapshot(codeSnap);
+    cout << "  Restored " << codeSnap.characters.size() << " nodes; text matches: "
+         << (repCodeRestart.getText() == expectedText ? "yes" : "NO") << "\n";
+    assert(repCodeRestart.getText() == expectedText);
+    assert(repCodeRestart.getSequence().size() == codeText.size());
+    // Re-serialising the restored replica must be byte-identical (stable round trip)
+    assert(repCodeRestart.createSnapshot("code-room", "Code {Room}").toJson() == codeJson);
+    cout << "  [PASS] Case 7: Structural characters survive snapshot serialization.\n";
+
     printHeader("ALL PHASE 6 C++ VERIFICATION CASES PASSED (0 ERRORS)");
     return 0;
 }

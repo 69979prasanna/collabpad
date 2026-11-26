@@ -110,24 +110,10 @@ struct DocumentSnapshot {
                 break;
             }
 
-            // Find end of this character object
-            size_t closeObj = json.find('}', nextObj);
-            if (closeObj == std::string::npos) break;
-
             // Character object may contain nested objects {"id":{...},"afterId":{...}}
-            // So find matching brace
-            int depth = 0;
-            size_t objEnd = nextObj;
-            for (size_t i = nextObj; i < json.size(); ++i) {
-                if (json[i] == '{') depth++;
-                else if (json[i] == '}') {
-                    depth--;
-                    if (depth == 0) {
-                        objEnd = i;
-                        break;
-                    }
-                }
-            }
+            // and a "value" that is itself '{' or '}', so match braces string-aware.
+            size_t objEnd = findObjectEnd(json, nextObj);
+            if (objEnd == std::string::npos) break;
 
             std::string itemJson = json.substr(nextObj, objEnd - nextObj + 1);
 
@@ -159,18 +145,8 @@ struct DocumentSnapshot {
                         break;
                     }
 
-                    int depth = 0;
-                    size_t objEnd = nextObj;
-                    for (size_t i = nextObj; i < json.size(); ++i) {
-                        if (json[i] == '{') depth++;
-                        else if (json[i] == '}') {
-                            depth--;
-                            if (depth == 0) {
-                                objEnd = i;
-                                break;
-                            }
-                        }
-                    }
+                    size_t objEnd = findObjectEnd(json, nextObj);
+                    if (objEnd == std::string::npos) break;
 
                     std::string itemJson = json.substr(nextObj, objEnd - nextObj + 1);
 
@@ -195,6 +171,30 @@ struct DocumentSnapshot {
     }
 
 private:
+    /**
+     * @brief Returns the index of the '}' matching the '{' at `start`, ignoring
+     * braces inside JSON string literals (honouring backslash escapes).
+     * Returns npos if the object is unterminated.
+     */
+    static size_t findObjectEnd(const std::string& json, size_t start) {
+        int depth = 0;
+        bool inString = false;
+        for (size_t i = start; i < json.size(); ++i) {
+            char c = json[i];
+            if (inString) {
+                if (c == '\\') ++i;          // skip escaped character
+                else if (c == '"') inString = false;
+            } else if (c == '"') {
+                inString = true;
+            } else if (c == '{') {
+                ++depth;
+            } else if (c == '}') {
+                if (--depth == 0) return i;
+            }
+        }
+        return std::string::npos;
+    }
+
     static std::string escapeJson(const std::string& s) {
         std::string res;
         res.reserve(s.size() + 8);

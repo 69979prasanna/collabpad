@@ -155,8 +155,12 @@ void Session::send(const string& message) {
         frame.push_back(static_cast<uint8_t>(len & 0xFF));
     } else {
         frame.push_back(127);
+        // Widen before shifting: size_t is 32-bit on the i386 MinGW build, and
+        // shifting it by >= 32 bits is undefined (it wrapped, corrupting the
+        // 64-bit length of any frame > 65535 bytes, e.g. large join snapshots).
+        const uint64_t len64 = static_cast<uint64_t>(len);
         for (int i = 7; i >= 0; --i) {
-            frame.push_back(static_cast<uint8_t>((len >> (i * 8)) & 0xFF));
+            frame.push_back(static_cast<uint8_t>((len64 >> (i * 8)) & 0xFF));
         }
     }
     // Append payload
