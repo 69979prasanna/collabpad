@@ -82,10 +82,41 @@ export function Editor({
         {/* Empty state (decorative; clicks pass through to the textarea) */}
         {!text && (
           <div className="editor-empty" aria-hidden="true">
-            <Cube3D className="editor-empty-cube" />
-            <div className="editor-empty-title">Start writing together</div>
-            <div className="editor-empty-hint">
-              Edits sync live to everyone in this room · Ctrl+B toggles the sidebar
+            <div className="hero-copy">
+              <div className="hero-eyebrow">
+                Real-time
+                <br />
+                Conflict-free
+                <br />
+                Together
+              </div>
+              <h2 className="hero-title">
+                <span className="hero-script">Write</span>
+                <span className="hero-serif">Every</span>
+                <span className="hero-sans">Moment</span>
+              </h2>
+              <p className="hero-sub">
+                Start typing. Every keystroke merges live for everyone in this room.
+              </p>
+              <div className="hero-stats">
+                <div className="hero-stat">
+                  <strong>RGA</strong>
+                  <span>Conflict-free merge</span>
+                </div>
+                <div className="hero-stat">
+                  <strong>LIVE</strong>
+                  <span>Shared cursors</span>
+                </div>
+                <div className="hero-stat">
+                  <strong>OFFLINE</strong>
+                  <span>Edits buffered &amp; synced</span>
+                </div>
+              </div>
+            </div>
+            <div className="hero-visual">
+              <div className="hero-orbit hero-orbit-1" />
+              <div className="hero-orbit hero-orbit-2" />
+              <Cube3D className="editor-empty-cube" />
             </div>
           </div>
         )}
